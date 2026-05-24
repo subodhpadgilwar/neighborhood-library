@@ -53,7 +53,7 @@ export function SearchableSelect<T>({
   }, [items, search, getSearchText]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -72,18 +72,24 @@ export function SearchableSelect<T>({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] p-0"
+        className="flex w-[var(--radix-popover-trigger-width)] max-h-72 flex-col overflow-hidden p-0"
         align="start"
+        onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <div className="border-b p-2">
+        <div className="shrink-0 border-b p-2">
           <Input
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8"
+            onKeyDown={(event) => event.stopPropagation()}
           />
         </div>
-        <div className="max-h-56 overflow-y-auto p-1">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1"
+          onWheel={(event) => event.stopPropagation()}
+          onTouchMove={(event) => event.stopPropagation()}
+        >
           {filtered.length === 0 ? (
             <p className="px-2 py-4 text-center text-xs text-muted-foreground">
               {emptyMessage}

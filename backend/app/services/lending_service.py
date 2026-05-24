@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -18,6 +19,7 @@ from app.models.lending import LendingRecord
 from app.repositories.book_repo import BookRepository
 from app.repositories.lending_repo import LendingRepository
 from app.repositories.member_repo import MemberRepository
+from app.schemas.lending import LendingFilterParams, LendingHistoryResponse, LendingResponse
 from app.services.member_service import MemberService
 
 
@@ -158,6 +160,25 @@ class LendingService:
     ) -> list[LendingRecord]:
         await MemberService.get_by_id(db, member_id)
         return await LendingRepository.get_active_by_member(db, member_id)
+
+    @staticmethod
+    async def get_history(
+        db: AsyncSession,
+        filters: LendingFilterParams,
+    ) -> LendingHistoryResponse:
+        records, total = await LendingRepository.get_history(db, filters)
+        page = (filters.skip // filters.limit) + 1 if filters.limit > 0 else 1
+        total_pages = math.ceil(total / filters.limit) if filters.limit > 0 else 0
+
+        library_api.info("History fetched: %s records, filters=%s", total, filters)
+
+        return LendingHistoryResponse(
+            items=[LendingResponse.model_validate(record) for record in records],
+            total=total,
+            page=page,
+            limit=filters.limit,
+            total_pages=total_pages,
+        )
 
     @staticmethod
     async def get_all_active(db: AsyncSession) -> list[LendingRecord]:

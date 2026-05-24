@@ -12,6 +12,8 @@ export type {
   Lending,
   BorrowRequest,
   UpdateDueDateRequest,
+  LendingFilters,
+  LendingHistoryResponse,
 } from "./lending";
 
 export type {

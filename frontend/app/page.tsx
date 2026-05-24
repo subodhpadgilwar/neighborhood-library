@@ -1,7 +1,6 @@
 "use client";
 
-import { parseISO } from "date-fns";
-import { AlertTriangle, ArrowLeftRight, BookOpen, Plus, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Plus, UserPlus, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -119,13 +118,24 @@ export default function DashboardPage() {
         memberService.getAll(),
         lendingService.getAllActive(),
         lendingService.getOverdue(),
+        lendingService.getHistory({
+          limit: 5,
+          sort_by: "borrowed_at",
+          sort_order: "desc",
+        }),
       ]);
 
       if (cancelled) {
         return;
       }
 
-      const labels = ["books", "members", "active loans", "overdue loans"];
+      const labels = [
+        "books",
+        "members",
+        "active loans",
+        "overdue loans",
+        "recent activity",
+      ];
       const errors: string[] = [];
 
       const books =
@@ -136,6 +146,8 @@ export default function DashboardPage() {
         results[2].status === "fulfilled" ? results[2].value : [];
       const overdueLoans =
         results[3].status === "fulfilled" ? results[3].value : [];
+      const historyResult =
+        results[4].status === "fulfilled" ? results[4].value : null;
 
       results.forEach((result, index) => {
         if (result.status === "rejected") {
@@ -147,12 +159,7 @@ export default function DashboardPage() {
         setError(errors.join(". ") + ".");
       }
 
-      const recentLoans = [...activeLoans]
-        .sort(
-          (a, b) =>
-            parseISO(b.borrowed_at).getTime() - parseISO(a.borrowed_at).getTime(),
-        )
-        .slice(0, 5);
+      const recentLoans = historyResult?.items ?? [];
 
       setData({
         booksCount: books.length,
@@ -240,7 +247,9 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
                 <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Last 5 active loans</CardDescription>
+                <CardDescription>
+                  Last 5 lending actions (borrowed or returned)
+                </CardDescription>
               </div>
               <Button variant="link" className="h-auto p-0" asChild>
                 <Link href="/lending">View All</Link>
@@ -251,35 +260,51 @@ export default function DashboardPage() {
                 <LoadingSkeleton rows={5} columns={5} />
               ) : data?.recentLoans.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No active loans yet.
+                  No lending activity yet.
                 </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Book</TableHead>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Borrowed Date</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data?.recentLoans.map((loan) => (
-                      <TableRow key={loan.id}>
-                        <TableCell className="font-medium">
-                          {loan.book_title}
-                        </TableCell>
-                        <TableCell>{loan.member_name}</TableCell>
-                        <TableCell>{formatDate(loan.borrowed_at)}</TableCell>
-                        <TableCell>{formatDate(loan.due_date)}</TableCell>
-                        <TableCell>
-                          <LoanStatusBadge status={getLoanStatus(loan)} />
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Book</TableHead>
+                        <TableHead>Member</TableHead>
+                        <TableHead>Borrowed Date</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data?.recentLoans.map((loan) => (
+                        <TableRow key={loan.id}>
+                          <TableCell className="font-medium">
+                            {loan.book_title}
+                          </TableCell>
+                          <TableCell>{loan.member_name}</TableCell>
+                          <TableCell>{formatDate(loan.borrowed_at)}</TableCell>
+                          <TableCell>{formatDate(loan.due_date)}</TableCell>
+                          <TableCell>
+                            {loan.returned_at ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200"
+                              >
+                                Returned
+                              </Badge>
+                            ) : (
+                              <LoanStatusBadge status={getLoanStatus(loan)} />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="mt-4 text-center">
+                    <Button variant="link" className="h-auto p-0" asChild>
+                      <Link href="/lending?tab=history">View Full History</Link>
+                    </Button>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

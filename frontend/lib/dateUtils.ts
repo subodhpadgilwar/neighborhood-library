@@ -58,7 +58,13 @@ export function isCalendarDayBefore(
   );
 }
 
-/** Converts YYYY-MM-DD from a date input to an ISO string for the API. */
+/** Converts YYYY-MM-DD from a date input to start-of-day ISO for the API. */
+export function dateInputToStartOfDayIso(dateInput: string): string {
+  const [year, month, day] = dateInput.split("-").map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
+}
+
+/** Converts YYYY-MM-DD from a date input to end-of-day ISO for the API. */
 export function dateInputToApiIso(dateInput: string): string {
   const [year, month, day] = dateInput.split("-").map(Number);
   return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString();
