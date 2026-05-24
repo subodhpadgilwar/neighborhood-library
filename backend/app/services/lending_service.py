@@ -77,6 +77,14 @@ class LendingService:
         return await LendingRepository.get_by_member(db, member_id)
 
     @staticmethod
+    async def get_member_active_loans(
+        db: AsyncSession,
+        member_id: UUID,
+    ) -> list[LendingRecord]:
+        await MemberService.get_by_id(db, member_id)
+        return await LendingRepository.get_active_by_member(db, member_id)
+
+    @staticmethod
     async def get_all_active(db: AsyncSession) -> list[LendingRecord]:
         return await LendingRepository.get_all_active(db)
 
