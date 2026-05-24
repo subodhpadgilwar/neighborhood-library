@@ -13,7 +13,7 @@ from starlette.responses import Response
 from app.api.v1.router import api_router
 from app.config import settings
 from app.core.logger import library_api
-from app.core.seeder import seed_default_admin
+from app.core.seeder import seed_default_admin, seed_sample_books
 from app.database import AsyncSessionLocal
 
 API_VERSION = "1.0.0"
@@ -26,7 +26,9 @@ async def lifespan(app: FastAPI):
     library_api.info("Timezone: %s", settings.app_timezone)
 
     async with AsyncSessionLocal() as db:
-        await seed_default_admin(db)
+        admin = await seed_default_admin(db)
+        if admin is not None:
+            await seed_sample_books(db, admin.id)
 
     library_api.info("API is ready")
     yield
