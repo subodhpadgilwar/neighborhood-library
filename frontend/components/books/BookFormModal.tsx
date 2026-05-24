@@ -27,6 +27,7 @@ interface BookFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   book?: Book | null;
+  initialISBN?: string;
   onSuccess: () => void;
 }
 
@@ -60,6 +61,7 @@ export function BookFormModal({
   open,
   onOpenChange,
   book,
+  initialISBN,
   onSuccess,
 }: BookFormModalProps) {
   const isEdit = book != null;
@@ -72,10 +74,14 @@ export function BookFormModal({
     if (!open) {
       return;
     }
-    setForm(book ? bookToForm(book) : emptyForm);
+    setForm(
+      book
+        ? bookToForm(book)
+        : { ...emptyForm, isbn: initialISBN?.trim() ?? "" },
+    );
     setFieldErrors({});
     setApiError(null);
-  }, [open, book]);
+  }, [open, book, initialISBN]);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

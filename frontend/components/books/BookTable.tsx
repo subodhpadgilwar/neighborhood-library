@@ -20,6 +20,7 @@ export type TitleSortDirection = "asc" | "desc";
 interface BookTableProps {
   books: Book[];
   sortDirection: TitleSortDirection;
+  highlightedBookId?: string | null;
   onSortChange: () => void;
   onEdit: (book: Book) => void;
   onDeactivate: (book: Book) => void;
@@ -60,6 +61,7 @@ function SortIcon({ direction }: { direction: TitleSortDirection }) {
 export function BookTable({
   books,
   sortDirection,
+  highlightedBookId,
   onSortChange,
   onEdit,
   onDeactivate,
@@ -97,7 +99,11 @@ export function BookTable({
           return (
             <TableRow
               key={book.id}
-              className={cn(!isActive && "opacity-60")}
+              className={cn(
+                !isActive && "opacity-60",
+                highlightedBookId === book.id &&
+                  "bg-emerald-50/80 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:ring-emerald-800",
+              )}
             >
               <TableCell
                 className={cn(

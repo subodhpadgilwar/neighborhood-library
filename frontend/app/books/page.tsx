@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { Camera, Plus, Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -11,7 +11,9 @@ import {
   type TitleSortDirection,
 } from "@/components/books/BookTable";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { BarcodeScanner } from "@/components/shared/BarcodeScanner";
 import { DeactivateConfirmDialog } from "@/components/shared/DeactivateConfirmDialog";
+import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorMessage } from "@/components/shared/ErrorMessage";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -49,6 +51,11 @@ function BooksPageContent() {
   const [showInactive, setShowInactive] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [highlightedBookId, setHighlightedBookId] = useState<string | null>(
+    null,
+  );
+  const [initialISBN, setInitialISBN] = useState<string | undefined>();
 
   const loadBooks = useCallback(async () => {
     setIsLoading(true);
@@ -129,6 +136,30 @@ function BooksPageContent() {
     setModalOpen(open);
     if (!open) {
       setEditingBook(null);
+      setInitialISBN(undefined);
+    }
+  }
+
+  async function handleBookPageScan(rawIsbn: string) {
+    const isbn = normalizeISBNFromScan(rawIsbn);
+    setIsScannerOpen(false);
+
+    try {
+      const book = await bookService.getByISBN(isbn);
+      setSearch(book.title);
+      setHighlightedBookId(book.id);
+      setPage(1);
+      toast.success(`Book found: ${book.title}`);
+    } catch (err) {
+      const error = err as { statusCode?: number; status?: string };
+      if (error.statusCode === 404 || error.status === "not_found") {
+        toast.error("Book not found. Add it first?");
+        setInitialISBN(isbn);
+        setEditingBook(null);
+        setModalOpen(true);
+        return;
+      }
+      toast.error("Failed to look up book by ISBN.");
     }
   }
 
@@ -180,19 +211,35 @@ function BooksPageContent() {
                 Show inactive
               </Label>
             </div>
-            <div className="relative max-w-md flex-1">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                type="search"
-                placeholder="Search by title or author…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
+            <div className="flex max-w-md flex-1 gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  type="search"
+                  placeholder="Search by title or author…"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setHighlightedBookId(null);
+                  }}
+                  className="pl-8"
+                  disabled={isLoading}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                onClick={() => setIsScannerOpen(true)}
                 disabled={isLoading}
-              />
+                title="Scan book barcode or QR code"
+              >
+                <Camera className="size-4" aria-hidden />
+                Scan
+              </Button>
             </div>
           </div>
           <Button onClick={openCreateModal} className="shrink-0 gap-2">
@@ -216,6 +263,7 @@ function BooksPageContent() {
             <BookTable
               books={paginatedBooks}
               sortDirection={sortDirection}
+              highlightedBookId={highlightedBookId}
               onSortChange={toggleSort}
               onEdit={openEditModal}
               onDeactivate={handleDeactivate}
@@ -262,7 +310,15 @@ function BooksPageContent() {
         open={modalOpen}
         onOpenChange={handleModalOpenChange}
         book={editingBook}
+        initialISBN={initialISBN}
         onSuccess={() => void loadBooks()}
+      />
+
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleBookPageScan}
+        title="Scan Book Barcode"
       />
 
       <DeactivateConfirmDialog

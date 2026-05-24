@@ -1,12 +1,13 @@
 "use client";
 
 import { startOfDay } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Camera, Check, Loader2, X } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { formatLoanDate } from "@/components/lending/loanUtils";
 import { SearchableSelect } from "@/components/lending/SearchableSelect";
+import { BarcodeScanner } from "@/components/shared/BarcodeScanner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
   formatDateInputValue,
   isCalendarDayBefore,
 } from "@/lib/dateUtils";
+import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { cn } from "@/lib/utils";
 import { bookService, lendingService, memberService } from "@/services";
 import type { Book, Member } from "@/types";
@@ -32,7 +34,10 @@ import type { Book, Member } from "@/types";
 type ApiClientError = {
   status: string;
   message: string;
+  statusCode?: number;
 };
+
+type ScanStatus = "idle" | "scanning" | "found" | "not_found" | "error";
 
 interface BorrowModalProps {
   open: boolean;
@@ -51,6 +56,11 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
+  const [scannedISBN, setScannedISBN] = useState<string | null>(null);
+  const [scannedBook, setScannedBook] = useState<Book | null>(null);
+  const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
 
   const todayInput = formatDateInputValue(startOfDay(new Date()));
   const defaultDueDateLabel = formatDate(
@@ -68,6 +78,16 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
     [books],
   );
 
+  const bookSelectItems = useMemo(() => {
+    if (
+      scannedBook &&
+      !availableBooks.some((book) => book.id === scannedBook.id)
+    ) {
+      return [...availableBooks, scannedBook];
+    }
+    return availableBooks;
+  }, [availableBooks, scannedBook]);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -79,6 +99,11 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
     setDueDateError(null);
     setApiError(null);
     setFieldError(null);
+    setIsScannerOpen(false);
+    setScanStatus("idle");
+    setScannedISBN(null);
+    setScannedBook(null);
+    setScanErrorMessage(null);
 
     let cancelled = false;
 
@@ -110,6 +135,48 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
       cancelled = true;
     };
   }, [open]);
+
+  function clearScanStatus() {
+    setScanStatus("idle");
+    setScannedISBN(null);
+    setScannedBook(null);
+    setScanErrorMessage(null);
+  }
+
+  function handleBookChange(book: Book) {
+    setSelectedBook(book);
+    if (scannedBook && book.id !== scannedBook.id) {
+      clearScanStatus();
+    }
+  }
+
+  async function handleScan(rawIsbn: string) {
+    const isbn = normalizeISBNFromScan(rawIsbn);
+    setIsScannerOpen(false);
+    setScannedISBN(isbn);
+    setScanStatus("scanning");
+    setScannedBook(null);
+    setScanErrorMessage(null);
+
+    try {
+      const book = await bookService.getByISBN(isbn);
+      setScannedBook(book);
+      setSelectedBook(book);
+      setScanStatus("found");
+    } catch (err) {
+      const error = err as ApiClientError;
+      if (error.statusCode === 404 || error.status === "not_found") {
+        setScanStatus("not_found");
+        return;
+      }
+      setScanStatus("error");
+      setScanErrorMessage(
+        typeof error?.message === "string"
+          ? error.message
+          : "Failed to look up book by ISBN.",
+      );
+    }
+  }
 
   function validateDueDate(): boolean {
     if (!dueDateInput) {
@@ -152,6 +219,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
       setSelectedBook(null);
       setDueDateInput("");
       setFieldError(null);
+      clearScanStatus();
       onOpenChange(false);
       onSuccess();
     } catch (err) {
@@ -209,32 +277,114 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
 
           <div className="space-y-2">
             <Label>Book</Label>
-            <SearchableSelect
-              items={availableBooks}
-              value={selectedBook}
-              onChange={setSelectedBook}
-              getKey={(b) => b.id}
-              getSearchText={(b) => `${b.title} ${b.author}`}
-              placeholder="Select book…"
-              searchPlaceholder="Search books…"
-              disabled={isLoadingOptions || isSubmitting}
-              emptyMessage="No available books."
-              renderValue={(b) => (
-                <span>
-                  {b.title}{" "}
-                  <span className="text-muted-foreground">by {b.author}</span>
-                </span>
-              )}
-              renderItem={(b) => (
-                <span>
-                  <span className="font-medium">{b.title}</span>
-                  <br />
-                  <span className="text-xs text-muted-foreground">
-                    {b.author} · {b.copies_available} copies left
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <SearchableSelect
+                  items={bookSelectItems}
+                  value={selectedBook}
+                  onChange={handleBookChange}
+                  getKey={(b) => b.id}
+                  getSearchText={(b) => `${b.title} ${b.author} ${b.isbn ?? ""}`}
+                  placeholder="Select book…"
+                  searchPlaceholder="Search books…"
+                  disabled={isLoadingOptions || isSubmitting}
+                  emptyMessage="No available books."
+                  renderValue={(b) => (
+                    <span>
+                      {b.title}{" "}
+                      <span className="text-muted-foreground">
+                        by {b.author}
+                      </span>
+                    </span>
+                  )}
+                  renderItem={(b) => (
+                    <span>
+                      <span className="font-medium">{b.title}</span>
+                      <br />
+                      <span className="text-xs text-muted-foreground">
+                        {b.author} · {b.copies_available} copies left
+                      </span>
+                    </span>
+                  )}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                onClick={() => setIsScannerOpen(true)}
+                disabled={isLoadingOptions || isSubmitting}
+                title="Scan book barcode or QR code"
+              >
+                <Camera className="size-4" aria-hidden />
+                Scan
+              </Button>
+            </div>
+
+            {scanStatus === "scanning" ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                Looking up book…
+              </p>
+            ) : null}
+
+            {scanStatus === "found" && scannedBook && scannedISBN ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                <p className="flex items-start gap-2 font-medium">
+                  <Check className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>
+                    Book found: &ldquo;{scannedBook.title}&rdquo; by{" "}
+                    {scannedBook.author}
                   </span>
-                </span>
-              )}
-            />
+                </p>
+                <p className="mt-1 pl-6 text-xs opacity-90">
+                  ISBN: {scannedISBN} · {scannedBook.copies_available} copies
+                  available
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 pl-6 text-xs underline underline-offset-2"
+                  onClick={() => setIsScannerOpen(true)}
+                >
+                  Scan Again
+                </button>
+              </div>
+            ) : null}
+
+            {scanStatus === "not_found" && scannedISBN ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                <p className="flex items-start gap-2 font-medium">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>No book found with ISBN {scannedISBN}</span>
+                </p>
+                <p className="mt-1 pl-6 text-xs opacity-90">
+                  Please add this book first or select manually
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 pl-6 text-xs underline underline-offset-2"
+                  onClick={() => setIsScannerOpen(true)}
+                >
+                  Scan Again
+                </button>
+              </div>
+            ) : null}
+
+            {scanStatus === "error" ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p className="flex items-start gap-2 font-medium">
+                  <X className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>{scanErrorMessage ?? "Failed to look up book."}</span>
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 pl-6 text-xs underline underline-offset-2"
+                  onClick={() => setIsScannerOpen(true)}
+                >
+                  Scan Again
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -296,6 +446,13 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <BarcodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleScan}
+        title="Scan Book Barcode"
+      />
     </Dialog>
   );
 }
