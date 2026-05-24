@@ -35,7 +35,8 @@ class MemberService:
         member = await MemberRepository.create(db, data)
         member.created_by = staff_id
         await db.commit()
-        await db.refresh(member)
+        loaded = await MemberRepository.get_by_id(db, member.id)
+        member = loaded if loaded is not None else member
         library_api.info("Member registered: %s", member.email)
         return member
 

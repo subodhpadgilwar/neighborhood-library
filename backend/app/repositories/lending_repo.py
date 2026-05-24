@@ -3,18 +3,29 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.logger import library_api
 from app.core.timezone import now_utc
 from app.models.lending import LendingRecord
 
+_LENDING_LOAD_OPTIONS = (
+    selectinload(LendingRecord.book),
+    selectinload(LendingRecord.member),
+    selectinload(LendingRecord.created_by_staff),
+)
+
 
 class LendingRepository:
+    @staticmethod
+    def _select_lending():
+        return select(LendingRecord).options(*_LENDING_LOAD_OPTIONS)
+
     @staticmethod
     async def get_by_id(db: AsyncSession, lending_id: UUID) -> LendingRecord | None:
         library_api.debug("LendingRepository.get_by_id lending_id=%s", lending_id)
         result = await db.execute(
-            select(LendingRecord).where(LendingRecord.id == lending_id)
+            LendingRepository._select_lending().where(LendingRecord.id == lending_id)
         )
         return result.scalar_one_or_none()
 
@@ -42,7 +53,7 @@ class LendingRepository:
     async def get_by_member(db: AsyncSession, member_id: UUID) -> list[LendingRecord]:
         library_api.debug("LendingRepository.get_by_member member_id=%s", member_id)
         result = await db.execute(
-            select(LendingRecord)
+            LendingRepository._select_lending()
             .where(LendingRecord.member_id == member_id)
             .order_by(LendingRecord.borrowed_at.desc())
         )
@@ -58,7 +69,7 @@ class LendingRepository:
             member_id,
         )
         result = await db.execute(
-            select(LendingRecord)
+            LendingRepository._select_lending()
             .where(
                 LendingRecord.member_id == member_id,
                 LendingRecord.returned_at.is_(None),
@@ -71,7 +82,9 @@ class LendingRepository:
     async def get_all_active(db: AsyncSession) -> list[LendingRecord]:
         library_api.debug("LendingRepository.get_all_active")
         result = await db.execute(
-            select(LendingRecord).where(LendingRecord.returned_at.is_(None))
+            LendingRepository._select_lending().where(
+                LendingRecord.returned_at.is_(None)
+            )
         )
         return list(result.scalars().all())
 
@@ -80,7 +93,7 @@ class LendingRepository:
         library_api.debug("LendingRepository.get_overdue")
         current_time = now_utc()
         result = await db.execute(
-            select(LendingRecord).where(
+            LendingRepository._select_lending().where(
                 LendingRecord.returned_at.is_(None),
                 LendingRecord.due_date < current_time,
             )
@@ -110,8 +123,8 @@ class LendingRepository:
         )
         db.add(lending)
         await db.commit()
-        await db.refresh(lending)
-        return lending
+        loaded = await LendingRepository.get_by_id(db, lending.id)
+        return loaded if loaded is not None else lending
 
     @staticmethod
     async def mark_returned(
@@ -127,5 +140,5 @@ class LendingRepository:
         lending.returned_at = now_utc()
         lending.updated_by = staff_id
         await db.commit()
-        await db.refresh(lending)
-        return lending
+        loaded = await LendingRepository.get_by_id(db, lending.id)
+        return loaded if loaded is not None else lending

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
 from app.core.timezone import to_local
 
@@ -59,11 +59,28 @@ class MemberResponse(MemberBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    created_by: Optional[UUID] = None
-    updated_by: Optional[UUID] = None
+
+    created_by_staff: Any = Field(default=None, exclude=True, repr=False)
+    updated_by_staff: Any = Field(default=None, exclude=True, repr=False)
 
     model_config = ConfigDict(from_attributes=True)
 
-    def model_post_init(self, __context: Any) -> None:
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def created_by(self) -> str | None:
+        staff = getattr(self, "created_by_staff", None)
+        if staff is None:
+            return None
+        return getattr(staff, "full_name", None)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def updated_by(self) -> str | None:
+        staff = getattr(self, "updated_by_staff", None)
+        if staff is None:
+            return None
+        return getattr(staff, "full_name", None)
+
+    def model_post_init(self, __context: object) -> None:
         self.created_at = to_local(self.created_at)  # type: ignore[misc]
         self.updated_at = to_local(self.updated_at)  # type: ignore[misc]

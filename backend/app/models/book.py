@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
 from sqlalchemy import CheckConstraint, Integer, String
@@ -11,6 +11,7 @@ from app.models.base import AuditMixin
 
 if TYPE_CHECKING:
     from app.models.lending import LendingRecord
+    from app.models.staff import Staff
 
 
 class Book(Base, AuditMixin):
@@ -32,6 +33,16 @@ class Book(Base, AuditMixin):
     copies_total: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     copies_available: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
+    created_by_staff: Mapped[Optional["Staff"]] = relationship(
+        "Staff",
+        foreign_keys="Book.created_by",
+        primaryjoin="Book.created_by == Staff.id",
+    )
+    updated_by_staff: Mapped[Optional["Staff"]] = relationship(
+        "Staff",
+        foreign_keys="Book.updated_by",
+        primaryjoin="Book.updated_by == Staff.id",
+    )
     lending_records: Mapped[list["LendingRecord"]] = relationship(
         back_populates="book",
     )

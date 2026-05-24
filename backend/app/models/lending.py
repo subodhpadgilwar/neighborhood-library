@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
 from sqlalchemy import DateTime, ForeignKey
@@ -14,6 +14,7 @@ from app.models.base import AuditMixin
 if TYPE_CHECKING:
     from app.models.book import Book
     from app.models.member import Member
+    from app.models.staff import Staff
 
 
 class LendingRecord(Base, AuditMixin):
@@ -47,3 +48,13 @@ class LendingRecord(Base, AuditMixin):
 
     book: Mapped["Book"] = relationship(back_populates="lending_records")
     member: Mapped["Member"] = relationship(back_populates="lending_records")
+    created_by_staff: Mapped[Optional["Staff"]] = relationship(
+        "Staff",
+        foreign_keys="LendingRecord.created_by",
+        primaryjoin="LendingRecord.created_by == Staff.id",
+    )
+    updated_by_staff: Mapped[Optional["Staff"]] = relationship(
+        "Staff",
+        foreign_keys="LendingRecord.updated_by",
+        primaryjoin="LendingRecord.updated_by == Staff.id",
+    )

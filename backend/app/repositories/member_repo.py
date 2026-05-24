@@ -2,13 +2,23 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.logger import library_api
 from app.models.member import Member
 from app.schemas.member import MemberCreate, MemberUpdate
 
+_MEMBER_LOAD_OPTIONS = (
+    selectinload(Member.created_by_staff),
+    selectinload(Member.updated_by_staff),
+)
+
 
 class MemberRepository:
+    @staticmethod
+    def _select_members():
+        return select(Member).options(*_MEMBER_LOAD_OPTIONS)
+
     @staticmethod
     async def get_all(
         db: AsyncSession,
@@ -16,13 +26,17 @@ class MemberRepository:
         limit: int = 100,
     ) -> list[Member]:
         library_api.debug("MemberRepository.get_all skip=%s limit=%s", skip, limit)
-        result = await db.execute(select(Member).offset(skip).limit(limit))
+        result = await db.execute(
+            MemberRepository._select_members().offset(skip).limit(limit)
+        )
         return list(result.scalars().all())
 
     @staticmethod
     async def get_by_id(db: AsyncSession, member_id: UUID) -> Member | None:
         library_api.debug("MemberRepository.get_by_id member_id=%s", member_id)
-        result = await db.execute(select(Member).where(Member.id == member_id))
+        result = await db.execute(
+            MemberRepository._select_members().where(Member.id == member_id)
+        )
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -39,8 +53,8 @@ class MemberRepository:
         member = Member(**payload)
         db.add(member)
         await db.commit()
-        await db.refresh(member)
-        return member
+        loaded = await MemberRepository.get_by_id(db, member.id)
+        return loaded if loaded is not None else member
 
     @staticmethod
     async def update(db: AsyncSession, member: Member, data: MemberUpdate) -> Member:
@@ -51,5 +65,5 @@ class MemberRepository:
         for field, value in updates.items():
             setattr(member, field, value)
         await db.commit()
-        await db.refresh(member)
-        return member
+        loaded = await MemberRepository.get_by_id(db, member.id)
+        return loaded if loaded is not None else member

@@ -2,13 +2,23 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.logger import library_api
 from app.models.book import Book
 from app.schemas.book import BookCreate, BookUpdate
 
+_BOOK_LOAD_OPTIONS = (
+    selectinload(Book.created_by_staff),
+    selectinload(Book.updated_by_staff),
+)
+
 
 class BookRepository:
+    @staticmethod
+    def _select_books():
+        return select(Book).options(*_BOOK_LOAD_OPTIONS)
+
     @staticmethod
     async def get_all(
         db: AsyncSession,
@@ -16,19 +26,25 @@ class BookRepository:
         limit: int = 100,
     ) -> list[Book]:
         library_api.debug("BookRepository.get_all skip=%s limit=%s", skip, limit)
-        result = await db.execute(select(Book).offset(skip).limit(limit))
+        result = await db.execute(
+            BookRepository._select_books().offset(skip).limit(limit)
+        )
         return list(result.scalars().all())
 
     @staticmethod
     async def get_by_id(db: AsyncSession, book_id: UUID) -> Book | None:
         library_api.debug("BookRepository.get_by_id book_id=%s", book_id)
-        result = await db.execute(select(Book).where(Book.id == book_id))
+        result = await db.execute(
+            BookRepository._select_books().where(Book.id == book_id)
+        )
         return result.scalar_one_or_none()
 
     @staticmethod
     async def get_by_isbn(db: AsyncSession, isbn: str) -> Book | None:
         library_api.debug("BookRepository.get_by_isbn isbn=%s", isbn)
-        result = await db.execute(select(Book).where(Book.isbn == isbn))
+        result = await db.execute(
+            BookRepository._select_books().where(Book.isbn == isbn)
+        )
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -40,8 +56,8 @@ class BookRepository:
         )
         db.add(book)
         await db.commit()
-        await db.refresh(book)
-        return book
+        loaded = await BookRepository.get_by_id(db, book.id)
+        return loaded if loaded is not None else book
 
     @staticmethod
     async def update(db: AsyncSession, book: Book, data: BookUpdate) -> Book:
@@ -49,8 +65,8 @@ class BookRepository:
         for field, value in data.model_dump(exclude_none=True).items():
             setattr(book, field, value)
         await db.commit()
-        await db.refresh(book)
-        return book
+        loaded = await BookRepository.get_by_id(db, book.id)
+        return loaded if loaded is not None else book
 
     @staticmethod
     async def delete(db: AsyncSession, book: Book) -> None:
@@ -63,13 +79,13 @@ class BookRepository:
         library_api.debug("BookRepository.decrement_copies book_id=%s", book.id)
         book.copies_available -= 1
         await db.commit()
-        await db.refresh(book)
-        return book
+        loaded = await BookRepository.get_by_id(db, book.id)
+        return loaded if loaded is not None else book
 
     @staticmethod
     async def increment_copies(db: AsyncSession, book: Book) -> Book:
         library_api.debug("BookRepository.increment_copies book_id=%s", book.id)
         book.copies_available += 1
         await db.commit()
-        await db.refresh(book)
-        return book
+        loaded = await BookRepository.get_by_id(db, book.id)
+        return loaded if loaded is not None else book

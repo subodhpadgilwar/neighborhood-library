@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
 from sqlalchemy import String
@@ -11,6 +11,7 @@ from app.models.base import AuditMixin
 
 if TYPE_CHECKING:
     from app.models.lending import LendingRecord
+    from app.models.staff import Staff
 
 
 class Member(Base, AuditMixin):
@@ -26,6 +27,16 @@ class Member(Base, AuditMixin):
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    created_by_staff: Mapped[Optional["Staff"]] = relationship(
+        "Staff",
+        foreign_keys="Member.created_by",
+        primaryjoin="Member.created_by == Staff.id",
+    )
+    updated_by_staff: Mapped[Optional["Staff"]] = relationship(
+        "Staff",
+        foreign_keys="Member.updated_by",
+        primaryjoin="Member.updated_by == Staff.id",
+    )
     lending_records: Mapped[list["LendingRecord"]] = relationship(
         back_populates="member",
     )

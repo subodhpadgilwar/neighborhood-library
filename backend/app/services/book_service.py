@@ -35,7 +35,8 @@ class BookService:
         book = await BookRepository.create(db, data)
         book.created_by = staff_id
         await db.commit()
-        await db.refresh(book)
+        loaded = await BookRepository.get_by_id(db, book.id)
+        book = loaded if loaded is not None else book
         library_api.info("Book created: %s", book.title)
         return book
 
