@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.core.timezone import now_utc, to_local, to_utc
 
@@ -10,10 +10,22 @@ from app.core.timezone import now_utc, to_local, to_utc
 class BorrowRequest(BaseModel):
     book_id: UUID
     member_id: UUID
+    due_date: Optional[datetime] = None
 
 
 class ReturnRequest(BaseModel):
     lending_id: UUID
+
+
+class UpdateDueDateRequest(BaseModel):
+    due_date: datetime
+
+    @field_validator("due_date")
+    @classmethod
+    def due_date_not_in_past(cls, value: datetime) -> datetime:
+        if to_utc(value) <= now_utc():
+            raise ValueError("Due date cannot be set in the past")
+        return value
 
 
 class LendingResponse(BaseModel):

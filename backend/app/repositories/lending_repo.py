@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -120,6 +120,7 @@ class LendingRepository:
         book_id: UUID,
         member_id: UUID,
         staff_id: UUID,
+        due_date: datetime,
     ) -> LendingRecord:
         library_api.debug(
             "LendingRepository.create_loan book_id=%s member_id=%s staff_id=%s",
@@ -132,10 +133,29 @@ class LendingRepository:
             book_id=book_id,
             member_id=member_id,
             borrowed_at=borrowed_at,
-            due_date=borrowed_at + timedelta(days=14),
+            due_date=due_date,
             created_by=staff_id,
         )
         db.add(lending)
+        await db.commit()
+        loaded = await LendingRepository.get_by_id(db, lending.id)
+        return loaded if loaded is not None else lending
+
+    @staticmethod
+    async def update_due_date(
+        db: AsyncSession,
+        lending: LendingRecord,
+        new_due_date: datetime,
+        staff_id: UUID,
+    ) -> LendingRecord:
+        library_api.debug(
+            "LendingRepository.update_due_date lending_id=%s staff_id=%s",
+            lending.id,
+            staff_id,
+        )
+        lending.due_date = new_due_date
+        lending.updated_by = staff_id
+        lending.updated_at = now_utc()
         await db.commit()
         loaded = await LendingRepository.get_by_id(db, lending.id)
         return loaded if loaded is not None else lending

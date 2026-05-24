@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_staff, get_db
 from app.models.staff import Staff
-from app.schemas.lending import BorrowRequest, LendingResponse
+from app.schemas.lending import BorrowRequest, LendingResponse, UpdateDueDateRequest
 from app.services.lending_service import LendingService
 
 router = APIRouter(prefix="/lending", tags=["Lending"])
@@ -25,6 +25,23 @@ async def borrow_book(
         db,
         data.book_id,
         data.member_id,
+        current_staff.id,
+        due_date=data.due_date,
+    )
+    return LendingResponse.model_validate(lending)
+
+
+@router.put("/{lending_id}/due-date", response_model=LendingResponse)
+async def update_due_date(
+    lending_id: UUID,
+    data: UpdateDueDateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_staff: Staff = Depends(get_current_staff),
+) -> LendingResponse:
+    lending = await LendingService.update_due_date(
+        db,
+        lending_id,
+        data.due_date,
         current_staff.id,
     )
     return LendingResponse.model_validate(lending)
