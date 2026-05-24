@@ -27,6 +27,15 @@ async def list_books(
     return [BookResponse.model_validate(book) for book in books]
 
 
+@router.get("/isbn/{isbn}", response_model=BookResponse)
+async def get_book_by_isbn(
+    isbn: str,
+    db: AsyncSession = Depends(get_db),
+) -> BookResponse:
+    book = await BookService.get_by_isbn(db, isbn)
+    return BookResponse.model_validate(book)
+
+
 @router.post("/", response_model=BookResponse, status_code=201)
 async def create_book(
     data: BookCreate,

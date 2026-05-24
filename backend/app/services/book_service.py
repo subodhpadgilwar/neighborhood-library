@@ -42,6 +42,21 @@ class BookService:
         return book
 
     @staticmethod
+    async def get_by_isbn(db: AsyncSession, isbn: str) -> Book:
+        book = await BookRepository.get_by_isbn(db, isbn)
+        if book is None:
+            raise BookNotFoundException(isbn)
+
+        if not book.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This book exists but is currently deactivated",
+            )
+
+        library_api.info("Book lookup by ISBN: %s", isbn)
+        return book
+
+    @staticmethod
     async def create(db: AsyncSession, data: BookCreate, staff_id: UUID) -> Book:
         if data.isbn is not None:
             existing = await BookRepository.get_by_isbn(db, data.isbn)
