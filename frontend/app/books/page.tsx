@@ -10,9 +10,11 @@ import {
   type TitleSortDirection,
 } from "@/components/books/BookTable";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorMessage } from "@/components/shared/ErrorMessage";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { bookService } from "@/services";
 import type { Book } from "@/types";
 
@@ -153,29 +155,16 @@ function BooksPageContent() {
           </Button>
         </div>
 
-        {error ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            {error}
-          </div>
-        ) : null}
+        {error ? <ErrorMessage message={error} /> : null}
 
         {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <LoadingSkeleton rows={6} columns={7} />
         ) : isEmpty ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-            <p className="text-sm text-muted-foreground">No books found</p>
-            <Button onClick={openCreateModal} className="mt-4 gap-2">
-              <Plus className="size-4" aria-hidden />
-              Add Book
-            </Button>
-          </div>
+          <EmptyState
+            message="No books found"
+            actionLabel="Add Book"
+            onAction={openCreateModal}
+          />
         ) : (
           <>
             <BookTable
@@ -234,11 +223,7 @@ function BooksPageContent() {
 function BooksPageFallback() {
   return (
     <AppLayout title="Books">
-      <div className="space-y-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
-      </div>
+      <LoadingSkeleton rows={6} columns={7} />
     </AppLayout>
   );
 }

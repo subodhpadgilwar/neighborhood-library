@@ -102,6 +102,9 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
         book_id: selectedBook.id,
       });
       toast.success("Book borrowed successfully");
+      setSelectedMember(null);
+      setSelectedBook(null);
+      setFieldError(null);
       onOpenChange(false);
       onSuccess();
     } catch (err) {
@@ -209,7 +212,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
               {isSubmitting ? (
                 <>
                   <Loader2 className="animate-spin" />
-                  Borrowing…
+                  Loading...
                 </>
               ) : (
                 "Borrow Book"

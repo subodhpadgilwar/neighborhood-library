@@ -133,6 +133,8 @@ export function MemberFormModal({
         await memberService.create(payload as MemberCreate);
         toast.success("Member registered successfully");
       }
+      setForm(emptyForm);
+      setFieldErrors({});
       onOpenChange(false);
       onSuccess();
     } catch (err) {
@@ -240,7 +242,7 @@ export function MemberFormModal({
               {isSubmitting ? (
                 <>
                   <Loader2 className="animate-spin" />
-                  Saving…
+                  Loading...
                 </>
               ) : isEdit ? (
                 "Save Changes"

@@ -143,7 +143,7 @@ export default function LoginPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="animate-spin" />
-                  Logging in…
+                  Loading...
                 </>
               ) : (
                 "Log in"

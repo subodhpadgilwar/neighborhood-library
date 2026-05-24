@@ -8,9 +8,11 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { MemberFormModal } from "@/components/members/MemberFormModal";
 import { MemberLoansModal } from "@/components/members/MemberLoansModal";
 import { MemberTable } from "@/components/members/MemberTable";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorMessage } from "@/components/shared/ErrorMessage";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { memberService } from "@/services";
 import type { Member } from "@/types";
 
@@ -156,29 +158,16 @@ function MembersPageContent() {
           </Button>
         </div>
 
-        {error ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            {error}
-          </div>
-        ) : null}
+        {error ? <ErrorMessage message={error} /> : null}
 
         {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
+          <LoadingSkeleton rows={6} columns={6} />
         ) : isEmpty ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-            <p className="text-sm text-muted-foreground">No members found</p>
-            <Button onClick={openCreateModal} className="mt-4 gap-2">
-              <UserPlus className="size-4" aria-hidden />
-              Register Member
-            </Button>
-          </div>
+          <EmptyState
+            message="No members found"
+            actionLabel="Register Member"
+            onAction={openCreateModal}
+          />
         ) : (
           <>
             <MemberTable
@@ -242,11 +231,7 @@ function MembersPageContent() {
 function MembersPageFallback() {
   return (
     <AppLayout title="Members">
-      <div className="space-y-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
-      </div>
+      <LoadingSkeleton rows={6} columns={6} />
     </AppLayout>
   );
 }

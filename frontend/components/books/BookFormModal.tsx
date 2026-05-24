@@ -124,6 +124,8 @@ export function BookFormModal({
         await bookService.create(payload as BookCreate);
         toast.success("Book added successfully");
       }
+      setForm(emptyForm);
+      setFieldErrors({});
       onOpenChange(false);
       onSuccess();
     } catch (err) {
@@ -243,7 +245,7 @@ export function BookFormModal({
               {isSubmitting ? (
                 <>
                   <Loader2 className="animate-spin" />
-                  Saving…
+                  Loading...
                 </>
               ) : isEdit ? (
                 "Save Changes"

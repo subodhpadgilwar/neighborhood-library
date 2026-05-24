@@ -1,10 +1,11 @@
 "use client";
 
 import {
+  daysOverdue,
   formatLoanDate,
-  getDaysOverdue,
   getLoanStatus,
 } from "@/components/lending/loanUtils";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { LoanStatusBadge } from "@/components/lending/LoanStatusBadge";
 import {
   Table,
@@ -23,11 +24,7 @@ interface OverdueTableProps {
 
 export function OverdueTable({ loans }: OverdueTableProps) {
   if (loans.length === 0) {
-    return (
-      <p className="py-12 text-center text-sm text-muted-foreground">
-        No overdue loans. Great work!
-      </p>
-    );
+    return <EmptyState message="No overdue loans. Great work!" />;
   }
 
   return (
@@ -45,12 +42,12 @@ export function OverdueTable({ loans }: OverdueTableProps) {
       </TableHeader>
       <TableBody>
         {loans.map((loan) => {
-          const daysOverdue = getDaysOverdue(loan.due_date);
+          const overdueDays = daysOverdue(loan.due_date);
           return (
             <TableRow
               key={loan.id}
               className={cn(
-                "border-destructive/10 bg-destructive/[0.03] hover:bg-destructive/10",
+                "border-destructive/10 bg-destructive/[0.03] hover:bg-destructive/15",
               )}
             >
               <TableCell className="font-medium text-destructive">
@@ -73,7 +70,7 @@ export function OverdueTable({ loans }: OverdueTableProps) {
               </TableCell>
               <TableCell>
                 <span className="font-semibold tabular-nums text-destructive">
-                  {daysOverdue} {daysOverdue === 1 ? "day" : "days"}
+                  {overdueDays} {overdueDays === 1 ? "day" : "days"}
                 </span>
               </TableCell>
               <TableCell>

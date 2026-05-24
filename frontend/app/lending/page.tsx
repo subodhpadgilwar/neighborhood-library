@@ -8,9 +8,10 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ActiveLoansTable } from "@/components/lending/ActiveLoansTable";
 import { BorrowModal } from "@/components/lending/BorrowModal";
 import { OverdueTable } from "@/components/lending/OverdueTable";
+import { ErrorMessage } from "@/components/shared/ErrorMessage";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { lendingService } from "@/services";
 import type { Lending } from "@/types";
@@ -82,14 +83,7 @@ function LendingPageContent() {
           </Button>
         </div>
 
-        {error ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            {error}
-          </div>
-        ) : null}
+        {error ? <ErrorMessage message={error} /> : null}
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
@@ -109,11 +103,7 @@ function LendingPageContent() {
 
           <TabsContent value="active" className="mt-4">
             {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
+              <LoadingSkeleton rows={5} columns={7} />
             ) : (
               <ActiveLoansTable
                 loans={activeLoans}
@@ -124,11 +114,7 @@ function LendingPageContent() {
 
           <TabsContent value="overdue" className="mt-4">
             {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
+              <LoadingSkeleton rows={5} columns={7} />
             ) : (
               <OverdueTable loans={overdueLoans} />
             )}
@@ -148,11 +134,7 @@ function LendingPageContent() {
 function LendingPageFallback() {
   return (
     <AppLayout title="Lending">
-      <div className="space-y-3">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
-      </div>
+      <LoadingSkeleton rows={5} columns={7} />
     </AppLayout>
   );
 }

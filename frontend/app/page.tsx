@@ -1,24 +1,16 @@
 "use client";
 
-import {
-  differenceInCalendarDays,
-  format,
-  parseISO,
-  startOfDay,
-} from "date-fns";
-import {
-  AlertTriangle,
-  BookOpen,
-  Plus,
-  UserPlus,
-  ArrowLeftRight,
-  X,
-} from "lucide-react";
+import { parseISO } from "date-fns";
+import { AlertTriangle, ArrowLeftRight, BookOpen, Plus, UserPlus, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppLayout } from "@/components/layout/AppLayout";
+import { getLoanStatus } from "@/components/lending/loanUtils";
+import { LoanStatusBadge } from "@/components/lending/LoanStatusBadge";
+import { ErrorMessage } from "@/components/shared/ErrorMessage";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDate } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 import {
   bookService,
@@ -45,56 +38,12 @@ import {
 } from "@/services";
 import type { Lending } from "@/types";
 
-type LoanStatus = "overdue" | "due-soon" | "active";
-
 interface DashboardData {
   booksCount: number;
   membersCount: number;
   activeLoansCount: number;
   overdueCount: number;
   recentLoans: Lending[];
-}
-
-function getLoanStatus(lending: Lending): LoanStatus {
-  if (lending.is_overdue) {
-    return "overdue";
-  }
-  const due = startOfDay(parseISO(lending.due_date));
-  const today = startOfDay(new Date());
-  const daysUntilDue = differenceInCalendarDays(due, today);
-  if (daysUntilDue >= 0 && daysUntilDue <= 3) {
-    return "due-soon";
-  }
-  return "active";
-}
-
-function formatDate(iso: string): string {
-  return format(parseISO(iso), "MMM d, yyyy");
-}
-
-function LoanStatusBadge({ status }: { status: LoanStatus }) {
-  if (status === "overdue") {
-    return (
-      <Badge
-        variant="destructive"
-        className="bg-destructive/15 text-destructive hover:bg-destructive/15"
-      >
-        Overdue
-      </Badge>
-    );
-  }
-  if (status === "due-soon") {
-    return (
-      <Badge className="border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-        Due Soon
-      </Badge>
-    );
-  }
-  return (
-    <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-      Active
-    </Badge>
-  );
 }
 
 interface StatCardProps {
@@ -146,16 +95,6 @@ function StatsSkeleton() {
             <Skeleton className="h-9 w-16" />
           </CardContent>
         </Card>
-      ))}
-    </div>
-  );
-}
-
-function TableSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Skeleton key={i} className="h-10 w-full" />
       ))}
     </div>
   );
@@ -241,12 +180,7 @@ export default function DashboardPage() {
     <AppLayout title="Dashboard">
       <div className="space-y-6">
         {error ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            {error} Some figures may be incomplete.
-          </div>
+          <ErrorMessage message={`${error} Some figures may be incomplete.`} />
         ) : null}
 
         {showBanner ? (
@@ -314,7 +248,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <TableSkeleton />
+                <LoadingSkeleton rows={5} columns={5} />
               ) : data?.recentLoans.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No active loans yet.

@@ -1,15 +1,12 @@
 "use client";
 
-import {
-  differenceInCalendarDays,
-  format,
-  parseISO,
-  startOfDay,
-} from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { getLoanStatus } from "@/components/lending/loanUtils";
+import { LoanStatusBadge } from "@/components/lending/LoanStatusBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorMessage } from "@/components/shared/ErrorMessage";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,57 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDate } from "@/lib/dateUtils";
 import { memberService } from "@/services";
 import type { Lending, Member } from "@/types";
-
-type LoanStatus = "overdue" | "due-soon" | "active";
 
 interface MemberLoansModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   member: Member | null;
-}
-
-function getLoanStatus(lending: Lending): LoanStatus {
-  if (lending.is_overdue) {
-    return "overdue";
-  }
-  const due = startOfDay(parseISO(lending.due_date));
-  const today = startOfDay(new Date());
-  const daysUntilDue = differenceInCalendarDays(due, today);
-  if (daysUntilDue >= 0 && daysUntilDue <= 3) {
-    return "due-soon";
-  }
-  return "active";
-}
-
-function formatDate(iso: string): string {
-  return format(parseISO(iso), "MMM d, yyyy");
-}
-
-function LoanStatusBadge({ status }: { status: LoanStatus }) {
-  if (status === "overdue") {
-    return (
-      <Badge
-        variant="destructive"
-        className="bg-destructive/15 text-destructive hover:bg-destructive/15"
-      >
-        Overdue
-      </Badge>
-    );
-  }
-  if (status === "due-soon") {
-    return (
-      <Badge className="border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-        Due Soon
-      </Badge>
-    );
-  }
-  return (
-    <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-      Active
-    </Badge>
-  );
 }
 
 export function MemberLoansModal({
@@ -144,13 +98,9 @@ export function MemberLoansModal({
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
+          <ErrorMessage message={error} />
         ) : loans.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No active loans
-          </p>
+          <EmptyState message="No active loans" />
         ) : (
           <Table>
             <TableHeader>
@@ -179,7 +129,11 @@ export function MemberLoansModal({
         )}
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Close
           </Button>
         </DialogFooter>
