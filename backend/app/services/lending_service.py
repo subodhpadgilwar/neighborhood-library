@@ -1,3 +1,9 @@
+"""Service layer for lending business logic.
+
+Orchestrates between repository layer and API layer. All business rules and
+validation that requires database context live here.
+"""
+
 import math
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -24,6 +30,8 @@ from app.services.member_service import MemberService
 
 
 class LendingService:
+    """Business logic for book borrow, return, and loan queries."""
+
     @staticmethod
     async def borrow_book(
         db: AsyncSession,
@@ -32,6 +40,36 @@ class LendingService:
         staff_id: UUID,
         due_date: datetime | None = None,
     ) -> LendingRecord:
+        """Create a new loan after validating borrow eligibility.
+
+        Enforces rules 1-4 before creating the lending record and decrementing
+        available copies:
+            1. The book must exist.
+            2. The member must exist.
+            3. At least one copy must be available.
+            4. The member must not already have an active loan for this book.
+
+        When ``due_date`` is omitted, the due date defaults to 14 days from now
+        (UTC). A custom due date must be strictly in the future.
+
+        Args:
+            db: Async database session.
+            book_id: UUID of the book to borrow.
+            member_id: UUID of the borrowing member.
+            staff_id: UUID of the staff member processing the loan.
+            due_date: Optional due datetime (converted to UTC); defaults to
+                14 days from borrow time when omitted.
+
+        Returns:
+            The newly created LendingRecord.
+
+        Raises:
+            BookNotFoundException: Rule 1 — book does not exist.
+            MemberNotFoundException: Rule 2 — member does not exist.
+            BookNotAvailableException: Rule 3 — no copies available.
+            AlreadyBorrowedException: Rule 4 — duplicate active loan for this
+                book and member pair.
+        """
         book = await BookRepository.get_by_id(db, book_id)
         if book is None:
             raise BookNotFoundException(book_id)
@@ -84,6 +122,20 @@ class LendingService:
         lending_id: UUID,
         staff_id: UUID,
     ) -> LendingRecord:
+        """Mark a loan as returned and restore one available copy when possible.
+
+        Args:
+            db: Async database session.
+            lending_id: UUID of the lending record to close.
+            staff_id: UUID of the staff member processing the return.
+
+        Returns:
+            The updated LendingRecord with ``returned_at`` set.
+
+        Raises:
+            LendingNotFoundException: If no lending record exists for the id.
+            AlreadyReturnedException: If the book was already returned.
+        """
         lending = await LendingRepository.get_by_id(db, lending_id)
         if lending is None:
             raise LendingNotFoundException()
@@ -107,6 +159,22 @@ class LendingService:
         due_date: datetime,
         staff_id: UUID,
     ) -> LendingRecord:
+        """Change the due date on an active (not yet returned) loan.
+
+        Args:
+            db: Async database session.
+            lending_id: UUID of the lending record to update.
+            due_date: New due datetime (converted to UTC).
+            staff_id: UUID of the staff member performing the action.
+
+        Returns:
+            The updated LendingRecord.
+
+        Raises:
+            LendingNotFoundException: If no lending record exists for the id.
+            HTTPException: If the loan is already returned, the due date is in
+                the past, or it precedes the borrow date.
+        """
         lending = await LendingRepository.get_by_id(db, lending_id)
         if lending is None:
             raise LendingNotFoundException()
@@ -150,6 +218,18 @@ class LendingService:
         db: AsyncSession,
         member_id: UUID,
     ) -> list[LendingRecord]:
+        """Return all lending records (active and returned) for a member.
+
+        Args:
+            db: Async database session.
+            member_id: Member UUID.
+
+        Returns:
+            List of LendingRecord models ordered by borrow date.
+
+        Raises:
+            MemberNotFoundException: If the member does not exist.
+        """
         await MemberService.get_by_id(db, member_id)
         return await LendingRepository.get_by_member(db, member_id)
 
@@ -158,6 +238,18 @@ class LendingService:
         db: AsyncSession,
         member_id: UUID,
     ) -> list[LendingRecord]:
+        """Return only active (not yet returned) loans for a member.
+
+        Args:
+            db: Async database session.
+            member_id: Member UUID.
+
+        Returns:
+            List of active LendingRecord models.
+
+        Raises:
+            MemberNotFoundException: If the member does not exist.
+        """
         await MemberService.get_by_id(db, member_id)
         return await LendingRepository.get_active_by_member(db, member_id)
 
@@ -166,6 +258,15 @@ class LendingService:
         db: AsyncSession,
         filters: LendingFilterParams,
     ) -> LendingHistoryResponse:
+        """Return paginated, filterable lending history with page metadata.
+
+        Args:
+            db: Async database session.
+            filters: Query filters, sort options, and pagination parameters.
+
+        Returns:
+            LendingHistoryResponse with items, total count, and page info.
+        """
         records, total = await LendingRepository.get_history(db, filters)
         page = (filters.skip // filters.limit) + 1 if filters.limit > 0 else 1
         total_pages = math.ceil(total / filters.limit) if filters.limit > 0 else 0
@@ -182,8 +283,24 @@ class LendingService:
 
     @staticmethod
     async def get_all_active(db: AsyncSession) -> list[LendingRecord]:
+        """Return every loan that has not yet been returned.
+
+        Args:
+            db: Async database session.
+
+        Returns:
+            List of active LendingRecord models.
+        """
         return await LendingRepository.get_all_active(db)
 
     @staticmethod
     async def get_overdue(db: AsyncSession) -> list[LendingRecord]:
+        """Return active loans whose due date is before the current UTC time.
+
+        Args:
+            db: Async database session.
+
+        Returns:
+            List of overdue LendingRecord models.
+        """
         return await LendingRepository.get_overdue(db)

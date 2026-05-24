@@ -1,3 +1,9 @@
+"""Application configuration using Pydantic BaseSettings.
+
+All settings are read from environment variables or the ``.env`` file in the
+backend project root. Used across database, auth, logging, and seeding.
+"""
+
 from pathlib import Path
 
 from pydantic import EmailStr, Field
@@ -7,6 +13,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
+    """Application settings loaded from environment variables.
+
+    Field groups:
+        Database: PostgreSQL connection (user, password, host, port, URL).
+        App: Runtime environment name and HTTP port.
+        Auth: JWT secret, algorithm, and token expiry.
+        Admin: Default admin account created on first startup.
+        Timezone: Application timezone for API responses and logging.
+        Logging: Log level and rotated file retention count.
+    """
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
@@ -47,6 +64,7 @@ class Settings(BaseSettings):
 
     @property
     def is_development(self) -> bool:
+        """Return True when ``app_env`` is ``development`` (case-insensitive)."""
         return self.app_env.lower() == "development"
 
 

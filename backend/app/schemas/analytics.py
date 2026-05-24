@@ -1,3 +1,5 @@
+"""Pydantic schemas for analytics endpoint responses."""
+
 from typing import Optional
 from uuid import UUID
 
@@ -5,6 +7,8 @@ from pydantic import BaseModel
 
 
 class GenreStats(BaseModel):
+    """Book inventory statistics grouped by genre."""
+
     genre: str
     total_books: int
     total_copies: int
@@ -13,6 +17,8 @@ class GenreStats(BaseModel):
 
 
 class MonthlyLendingStats(BaseModel):
+    """Lending activity aggregated by calendar month."""
+
     month: str
     total_loans: int
     returned_loans: int
@@ -21,6 +27,8 @@ class MonthlyLendingStats(BaseModel):
 
 
 class TopBookStats(BaseModel):
+    """Borrowing statistics for a single book."""
+
     id: UUID
     title: str
     author: str
@@ -34,6 +42,8 @@ class TopBookStats(BaseModel):
 
 
 class SummaryStatsResponse(BaseModel):
+    """High-level library dashboard summary counts."""
+
     total_books: int
     total_members: int
     active_loans: int

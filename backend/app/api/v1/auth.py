@@ -1,3 +1,8 @@
+"""API routes for authentication management.
+
+All routes protected by JWT authentication unless noted otherwise.
+"""
+
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +24,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
+    """Exchange staff credentials for a JWT access token (no auth required)."""
     staff = await authenticate_staff(
         db,
         form_data.username,
@@ -41,6 +47,7 @@ async def register(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Register a new staff account; requires an authenticated staff JWT."""
     staff = await StaffService.create(db, data, current_staff)
     return StaffResponse.model_validate(staff)
 
@@ -49,4 +56,5 @@ async def register(
 async def get_me(
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Return the profile of the currently authenticated staff member."""
     return StaffResponse.model_validate(current_staff)

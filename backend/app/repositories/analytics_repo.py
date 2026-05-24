@@ -1,3 +1,5 @@
+"""Repository layer for analytics database operations. Contains only database queries — no business logic. All business rules belong in the service layer."""
+
 import asyncio
 from datetime import timedelta
 from typing import Any
@@ -14,8 +16,19 @@ from app.models.member import Member
 
 
 class AnalyticsRepository:
+    """Data access layer for read-only analytics aggregations."""
+
     @staticmethod
     async def get_genre_distribution(db: AsyncSession) -> list[dict[str, Any]]:
+        """Aggregate active book inventory counts grouped by genre.
+
+        Args:
+            db: Async database session.
+
+        Returns:
+            List of dicts with genre, total_books, total_copies, and available_copies.
+            Only active books (``Book.is_active``) are included.
+        """
         library_api.debug("AnalyticsRepository.get_genre_distribution")
         genre_label = func.coalesce(Book.genre, "Uncategorized").label("genre")
         stmt = (
@@ -42,6 +55,16 @@ class AnalyticsRepository:
 
     @staticmethod
     async def get_monthly_lending(db: AsyncSession, months: int = 6) -> list[dict[str, Any]]:
+        """Aggregate lending activity by calendar month in the app timezone.
+
+        Args:
+            db: Async database session.
+            months: Number of months to include, counting back from the current month.
+
+        Returns:
+            List of dicts with month, total_loans, returned_loans, and overdue_loans.
+            Overdue counts reflect loans still open and past due at query time.
+        """
         library_api.debug("AnalyticsRepository.get_monthly_lending months=%s", months)
         local_borrowed = func.timezone(settings.app_timezone, LendingRecord.borrowed_at)
         month_bucket = func.date_trunc("month", local_borrowed).label("month")
@@ -93,6 +116,16 @@ class AnalyticsRepository:
         db: AsyncSession,
         limit: int = 5,
     ) -> list[dict[str, Any]]:
+        """Fetch the most-borrowed active books by total loan count.
+
+        Args:
+            db: Async database session.
+            limit: Maximum number of books to return.
+
+        Returns:
+            List of dicts with book metadata and total_borrows/current_borrows counts.
+            Only active books (``Book.is_active``) are included.
+        """
         library_api.debug("AnalyticsRepository.get_top_borrowed_books limit=%s", limit)
         total_borrows = func.count(LendingRecord.id).label("total_borrows")
         current_borrows = func.sum(
@@ -135,12 +168,32 @@ class AnalyticsRepository:
 
     @staticmethod
     async def _count_scalar(db: AsyncSession, stmt) -> int:
+        """Execute a scalar count/sum query and coerce the result to int.
+
+        Args:
+            db: Async database session.
+            stmt: SQLAlchemy select statement returning a single scalar value.
+
+        Returns:
+            Integer result, or 0 if the scalar is None.
+        """
         result = await db.execute(stmt)
         value = result.scalar_one()
         return int(value or 0)
 
     @staticmethod
     async def get_summary_stats(db: AsyncSession) -> dict[str, int]:
+        """Fetch dashboard summary counts across books, members, and loans.
+
+        Args:
+            db: Async database session.
+
+        Returns:
+            Dict with total_books, total_members, active_loans, overdue_loans,
+            total_copies, available_copies, loans_today, and returns_today.
+            Book and member totals count only active records; today metrics use
+            the application local timezone day boundary.
+        """
         library_api.debug("AnalyticsRepository.get_summary_stats")
         current_time = now_utc()
         app_tz = get_app_timezone()

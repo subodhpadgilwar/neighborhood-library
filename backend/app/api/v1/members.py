@@ -1,3 +1,8 @@
+"""API routes for member management.
+
+All routes protected by JWT authentication unless noted otherwise.
+"""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -21,6 +26,7 @@ async def list_members(
     limit: int = Query(100, ge=1, le=1000),
     include_inactive: bool = False,
 ) -> list[MemberResponse]:
+    """List library members with pagination and optional inactive filter."""
     members = await MemberService.get_all(
         db,
         skip=skip,
@@ -36,6 +42,7 @@ async def create_member(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> MemberResponse:
+    """Register a new library member."""
     member = await MemberService.create(db, data, current_staff.id)
     return MemberResponse.model_validate(member)
 
@@ -46,6 +53,7 @@ async def get_member(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> MemberResponse:
+    """Get a single member by id."""
     member = await MemberService.get_by_id(db, member_id)
     return MemberResponse.model_validate(member)
 
@@ -57,6 +65,7 @@ async def update_member(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> MemberResponse:
+    """Update member profile fields."""
     member = await MemberService.update(db, member_id, data, current_staff.id)
     return MemberResponse.model_validate(member)
 
@@ -67,6 +76,7 @@ async def delete_member(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> MemberResponse:
+    """Soft-delete a member when they have no active loans."""
     member = await MemberService.soft_delete(db, member_id, current_staff.id)
     return MemberResponse.model_validate(member)
 
@@ -77,6 +87,7 @@ async def restore_member(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> MemberResponse:
+    """Restore a previously deactivated member."""
     member = await MemberService.restore(db, member_id, current_staff.id)
     return MemberResponse.model_validate(member)
 
@@ -87,5 +98,6 @@ async def get_member_loans(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> list[LendingResponse]:
+    """List active (not returned) loans for a member."""
     loans = await LendingService.get_member_active_loans(db, member_id)
     return [LendingResponse.model_validate(loan) for loan in loans]

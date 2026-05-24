@@ -1,3 +1,8 @@
+"""API routes for book management.
+
+All routes protected by JWT authentication unless noted otherwise.
+"""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -18,6 +23,7 @@ async def list_books(
     limit: int = Query(100, ge=1, le=1000),
     include_inactive: bool = False,
 ) -> list[BookResponse]:
+    """List catalog books with pagination; optional inactive filter (no JWT)."""
     books = await BookService.get_all(
         db,
         skip=skip,
@@ -32,6 +38,7 @@ async def get_book_by_isbn(
     isbn: str,
     db: AsyncSession = Depends(get_db),
 ) -> BookResponse:
+    """Look up a book by ISBN for barcode scanning (no JWT)."""
     book = await BookService.get_by_isbn(db, isbn)
     return BookResponse.model_validate(book)
 
@@ -42,6 +49,7 @@ async def create_book(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> BookResponse:
+    """Create a new catalog book; requires JWT."""
     book = await BookService.create(db, data, current_staff.id)
     return BookResponse.model_validate(book)
 
@@ -51,6 +59,7 @@ async def get_book(
     book_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> BookResponse:
+    """Get a single book by id (no JWT)."""
     book = await BookService.get_by_id(db, book_id)
     return BookResponse.model_validate(book)
 
@@ -62,6 +71,7 @@ async def update_book(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> BookResponse:
+    """Update book fields; requires JWT."""
     book = await BookService.update(db, book_id, data, current_staff.id)
     return BookResponse.model_validate(book)
 
@@ -72,6 +82,7 @@ async def delete_book(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> BookResponse:
+    """Soft-delete a book when it has no active loans; requires JWT."""
     book = await BookService.soft_delete(db, book_id, current_staff.id)
     return BookResponse.model_validate(book)
 
@@ -82,5 +93,6 @@ async def restore_book(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> BookResponse:
+    """Restore a previously deactivated book; requires JWT."""
     book = await BookService.restore(db, book_id, current_staff.id)
     return BookResponse.model_validate(book)

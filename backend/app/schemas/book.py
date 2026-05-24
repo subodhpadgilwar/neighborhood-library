@@ -1,3 +1,5 @@
+"""Pydantic schemas for book CRUD operations. Handles validation and UTC to local timezone conversion."""
+
 from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
@@ -8,6 +10,8 @@ from app.core.timezone import to_local
 
 
 class BookBase(BaseModel):
+    """Shared book fields used by create and response schemas."""
+
     title: str = Field(min_length=1, max_length=255)
     author: str = Field(min_length=1, max_length=255)
     isbn: Optional[str] = Field(default=None, pattern=r"^\d{13}$")
@@ -18,6 +22,14 @@ class BookBase(BaseModel):
     @field_validator("shelf_location", mode="before")
     @classmethod
     def strip_shelf_location(cls, value: object) -> object:
+        """Strip whitespace from shelf_location; empty strings become None.
+
+        Args:
+            value: Raw shelf_location input.
+
+        Returns:
+            Stripped string, None if blank, or the original value if not a string.
+        """
         if value is None:
             return None
         if isinstance(value, str):
@@ -27,9 +39,22 @@ class BookBase(BaseModel):
 
 
 class BookCreate(BookBase):
+    """Schema for creating a new book."""
+
     @field_validator("title", "author", "genre", "isbn", mode="before")
     @classmethod
     def strip_non_empty_strings(cls, value: object) -> object:
+        """Strip whitespace and reject blank strings for required text fields.
+
+        Args:
+            value: Raw field input.
+
+        Returns:
+            Stripped string value.
+
+        Raises:
+            ValueError: If the value is a blank or whitespace-only string.
+        """
         if value is None:
             return value
         if isinstance(value, str):
@@ -41,6 +66,8 @@ class BookCreate(BookBase):
 
 
 class BookUpdate(BaseModel):
+    """Schema for partial book updates; all fields are optional."""
+
     title: Optional[str] = Field(default=None, min_length=1, max_length=255)
     author: Optional[str] = Field(default=None, min_length=1, max_length=255)
     isbn: Optional[str] = Field(default=None, pattern=r"^\d{13}$")
@@ -51,10 +78,20 @@ class BookUpdate(BaseModel):
     @field_validator("shelf_location", mode="before")
     @classmethod
     def strip_shelf_location(cls, value: object) -> object:
+        """Strip whitespace from shelf_location; empty strings become None.
+
+        Args:
+            value: Raw shelf_location input.
+
+        Returns:
+            Stripped string, None if blank, or the original value if not a string.
+        """
         return BookBase.strip_shelf_location(value)
 
 
 class BookResponse(BookBase):
+    """Schema for book API responses with audit metadata and local timestamps."""
+
     id: UUID
     copies_available: int
     is_active: bool
@@ -69,6 +106,7 @@ class BookResponse(BookBase):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def created_by(self) -> str | None:
+        """Full name of the staff member who created the book."""
         staff = getattr(self, "created_by_staff", None)
         if staff is None:
             return None
@@ -77,11 +115,13 @@ class BookResponse(BookBase):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def updated_by(self) -> str | None:
+        """Full name of the staff member who last updated the book."""
         staff = getattr(self, "updated_by_staff", None)
         if staff is None:
             return None
         return getattr(staff, "full_name", None)
 
     def model_post_init(self, __context: object) -> None:
+        """Convert UTC timestamps to the application local timezone."""
         self.created_at = to_local(self.created_at)  # type: ignore[misc]
         self.updated_at = to_local(self.updated_at)  # type: ignore[misc]

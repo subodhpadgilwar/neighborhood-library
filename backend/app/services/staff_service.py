@@ -1,3 +1,9 @@
+"""Service layer for staff business logic.
+
+Orchestrates between repository layer and API layer. All business rules and
+validation that requires database context live here.
+"""
+
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -17,11 +23,22 @@ from app.schemas.staff import (
 
 
 class StaffService:
+    """Business logic for library staff account operations."""
+
     @staticmethod
     async def get_all(
         db: AsyncSession,
         include_inactive: bool = False,
     ) -> list[Staff]:
+        """Return all staff accounts, optionally including deactivated users.
+
+        Args:
+            db: Async database session.
+            include_inactive: When True, include soft-deleted staff.
+
+        Returns:
+            List of Staff models.
+        """
         return await StaffRepository.get_all(db, include_inactive=include_inactive)
 
     @staticmethod
@@ -30,6 +47,19 @@ class StaffService:
         staff_id: UUID,
         include_inactive: bool = False,
     ) -> Staff:
+        """Fetch a single staff account by primary key.
+
+        Args:
+            db: Async database session.
+            staff_id: Staff UUID.
+            include_inactive: When True, allow loading a deactivated account.
+
+        Returns:
+            The Staff model.
+
+        Raises:
+            StaffNotFoundException: If no staff account exists for the given id.
+        """
         staff = await StaffRepository.get_by_id(
             db,
             staff_id,
@@ -45,6 +75,19 @@ class StaffService:
         data: StaffCreate,
         current_staff: Staff,
     ) -> Staff:
+        """Create a new staff account (admin-only).
+
+        Args:
+            db: Async database session.
+            data: Staff creation payload.
+            current_staff: Authenticated staff performing the action.
+
+        Returns:
+            The persisted Staff model.
+
+        Raises:
+            DuplicateEmailException: If the email is already registered.
+        """
         email = str(data.email)
         existing = await StaffRepository.get_by_email(db, email)
         if existing is not None:
@@ -65,6 +108,21 @@ class StaffService:
         data: StaffUpdate,
         current_staff: Staff,
     ) -> Staff:
+        """Update an existing staff account's profile fields.
+
+        Args:
+            db: Async database session.
+            staff_id: Staff UUID to update.
+            data: Partial update payload.
+            current_staff: Authenticated staff performing the action.
+
+        Returns:
+            The updated Staff model.
+
+        Raises:
+            StaffNotFoundException: If the staff account does not exist.
+            DuplicateEmailException: If the new email belongs to another account.
+        """
         staff = await StaffRepository.get_by_id(db, staff_id)
         if staff is None:
             raise StaffNotFoundException()
@@ -90,6 +148,19 @@ class StaffService:
         staff: Staff,
         data: ChangePasswordRequest,
     ) -> Staff:
+        """Change the authenticated staff member's own password.
+
+        Args:
+            db: Async database session.
+            staff: Currently authenticated Staff model.
+            data: Current and new password values.
+
+        Returns:
+            The Staff model with an updated password hash.
+
+        Raises:
+            HTTPException: If the current password is wrong or matches the new one.
+        """
         if not verify_password(data.current_password, staff.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -113,6 +184,20 @@ class StaffService:
         data: AdminChangePasswordRequest,
         current_staff: Staff,
     ) -> Staff:
+        """Reset another staff member's password (admin action).
+
+        Args:
+            db: Async database session.
+            staff_id: Target staff UUID.
+            data: New password payload.
+            current_staff: Authenticated admin performing the action.
+
+        Returns:
+            The Staff model with an updated password hash.
+
+        Raises:
+            StaffNotFoundException: If the target staff account does not exist.
+        """
         staff = await StaffRepository.get_by_id(db, staff_id)
         if staff is None:
             raise StaffNotFoundException()
@@ -131,6 +216,20 @@ class StaffService:
         staff_id: UUID,
         current_staff: Staff,
     ) -> Staff:
+        """Deactivate a staff account with safety checks.
+
+        Args:
+            db: Async database session.
+            staff_id: Staff UUID to deactivate.
+            current_staff: Authenticated staff performing the action.
+
+        Returns:
+            The deactivated Staff model.
+
+        Raises:
+            StaffNotFoundException: If the staff account does not exist.
+            HTTPException: If targeting the default admin or the caller's own account.
+        """
         staff = await StaffRepository.get_by_id(db, staff_id)
         if staff is None:
             raise StaffNotFoundException()
@@ -161,6 +260,19 @@ class StaffService:
         staff_id: UUID,
         current_staff: Staff,
     ) -> Staff:
+        """Reactivate a previously deactivated staff account.
+
+        Args:
+            db: Async database session.
+            staff_id: Staff UUID to restore.
+            current_staff: Authenticated staff performing the action.
+
+        Returns:
+            The restored Staff model.
+
+        Raises:
+            StaffNotFoundException: If no staff account exists for the given id.
+        """
         staff = await StaffRepository.get_by_id(db, staff_id, include_inactive=True)
         if staff is None:
             raise StaffNotFoundException()

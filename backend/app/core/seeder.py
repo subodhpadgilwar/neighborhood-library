@@ -1,3 +1,9 @@
+"""Database seeders that run on application startup.
+
+All seeders are idempotent — safe to run multiple times without creating
+duplicate records.
+"""
+
 from typing import TypedDict
 from uuid import UUID
 
@@ -13,6 +19,8 @@ from app.services.auth_service import get_staff_by_email
 
 
 class SampleBookData(TypedDict):
+    """Shape of each entry in ``SAMPLE_BOOKS`` for type checking."""
+
     title: str
     author: str
     isbn: str
@@ -106,11 +114,16 @@ SAMPLE_BOOKS: list[SampleBookData] = [
 
 
 async def seed_default_admin(db: AsyncSession) -> Staff | None:
-    """
-    Ensure the default admin staff account exists.
+    """Create the default admin staff from environment variables if none exists yet.
 
-    Idempotent and safe to run on every application startup.
-    Returns the admin Staff record, or None if seeding failed.
+    Idempotent: checks by email before creating so restarting the app never
+    duplicates the admin account.
+
+    Args:
+        db: Async database session.
+
+    Returns:
+        Existing or newly created ``Staff`` record, or None if seeding failed.
     """
     try:
         admin_email = str(settings.admin_email)
@@ -137,10 +150,14 @@ async def seed_default_admin(db: AsyncSession) -> Staff | None:
 
 
 async def seed_sample_books(db: AsyncSession, admin_id: UUID) -> None:
-    """
-    Seed the catalog with sample books when the database is empty.
+    """Seed sample books for testing and demonstration when the catalog is empty.
 
-    Idempotent: skips if any book already exists.
+    Only runs if no books exist in the database. Books are linked to the admin
+    via ``created_by`` for a consistent audit trail from the first record.
+
+    Args:
+        db: Async database session.
+        admin_id: UUID of the staff member to attribute as creator.
     """
     try:
         result = await db.execute(select(func.count()).select_from(Book))

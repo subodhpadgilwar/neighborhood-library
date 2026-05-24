@@ -1,3 +1,5 @@
+"""Aggregates version 1 API routers for auth, books, members, lending, staff, and analytics."""
+
 from fastapi import APIRouter
 
 from app.api.v1 import analytics, auth, books, lending, members, staff

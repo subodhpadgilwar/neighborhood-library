@@ -1,3 +1,9 @@
+"""Timezone utilities for the library API.
+
+All datetimes are stored as UTC in the database and converted to the configured
+local timezone (``APP_TIMEZONE``) for API responses and analytics bucketing.
+"""
+
 from datetime import datetime
 from typing import Optional, Tuple
 
@@ -10,21 +16,36 @@ MonthKey = Tuple[int, int]
 
 
 def get_app_timezone() -> pytz.BaseTzInfo:
-    """Return the configured application timezone as a pytz timezone object."""
+    """Return the configured pytz timezone object from ``APP_TIMEZONE``.
+
+    Returns:
+        pytz timezone instance for the application locale.
+    """
     return pytz.timezone(settings.app_timezone)
 
 
 def now_utc() -> datetime:
-    """Return the current time as a timezone-aware UTC datetime."""
+    """Return the current UTC datetime, timezone-aware.
+
+    Use this everywhere instead of ``datetime.utcnow()``, which returns a naive
+    datetime and can cause comparison bugs with timezone-aware columns.
+
+    Returns:
+        Current time as an aware UTC ``datetime``.
+    """
     return datetime.now(UTC)
 
 
 def to_local(dt: Optional[datetime]) -> Optional[datetime]:
-    """
-    Convert a UTC datetime to the application local timezone.
+    """Convert a UTC datetime to the configured local timezone.
 
-    Naive datetimes are treated as UTC. Returns a timezone-aware datetime
-    in APP_TIMEZONE, or None if dt is None.
+    Naive datetimes are treated as UTC. Returns None when ``dt`` is None.
+
+    Args:
+        dt: UTC or naive datetime to convert, or None.
+
+    Returns:
+        Timezone-aware datetime in ``APP_TIMEZONE``, or None.
     """
     if dt is None:
         return None
@@ -38,7 +59,14 @@ def to_local(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 def start_of_month_local(dt: Optional[datetime] = None) -> datetime:
-    """Return the first instant of the calendar month in APP_TIMEZONE."""
+    """Return the first instant of the calendar month in APP_TIMEZONE.
+
+    Args:
+        dt: Reference instant (UTC-aware); defaults to ``now_utc()`` when None.
+
+    Returns:
+        Timezone-aware datetime at 00:00:00 on the first day of that month.
+    """
     tz = get_app_timezone()
     if dt is None:
         dt = now_utc()
@@ -47,7 +75,15 @@ def start_of_month_local(dt: Optional[datetime] = None) -> datetime:
 
 
 def subtract_months(dt: datetime, months: int) -> datetime:
-    """Move backward by whole calendar months, preserving timezone."""
+    """Move backward by whole calendar months, preserving timezone.
+
+    Args:
+        dt: Starting datetime (typically timezone-aware).
+        months: Number of whole months to subtract (non-negative).
+
+    Returns:
+        Datetime in the same timezone, earlier by ``months`` calendar months.
+    """
     year = dt.year
     month = dt.month - months
     while month <= 0:
@@ -57,11 +93,16 @@ def subtract_months(dt: datetime, months: int) -> datetime:
 
 
 def month_key(dt: datetime) -> MonthKey:
-    """
-    Calendar (year, month) in APP_TIMEZONE.
+    """Return calendar (year, month) in APP_TIMEZONE for analytics grouping.
 
     Naive datetimes from PostgreSQL month buckets are treated as APP_TIMEZONE
-    wall time (see date_trunc on timezone-converted timestamps).
+    wall time (see ``date_trunc`` on timezone-converted timestamps).
+
+    Args:
+        dt: Datetime from a query bucket or synthetic month start.
+
+    Returns:
+        Tuple ``(year, month)`` for use as a dict key.
     """
     tz = get_app_timezone()
     if dt.tzinfo is None:
@@ -72,17 +113,30 @@ def month_key(dt: datetime) -> MonthKey:
 
 
 def format_month_label(year: int, month: int) -> str:
-    """Human-readable month label, e.g. 'May 2026'."""
+    """Format a calendar month as a human-readable label (e.g. ``May 2026``).
+
+    Args:
+        year: Four-digit year.
+        month: Month number 1–12.
+
+    Returns:
+        Abbreviated month and year string in ``APP_TIMEZONE``.
+    """
     label_dt = get_app_timezone().localize(datetime(year, month, 1))
     return label_dt.strftime("%b %Y")
 
 
 def to_utc(dt: Optional[datetime]) -> Optional[datetime]:
-    """
-    Convert a datetime to UTC.
+    """Convert a local datetime to UTC.
 
-    Naive datetimes are assumed to be in APP_TIMEZONE. Returns a
-    timezone-aware UTC datetime, or None if dt is None.
+    Used when receiving datetime input from the frontend. Naive datetimes are
+    assumed to be in ``APP_TIMEZONE``.
+
+    Args:
+        dt: Local or naive datetime to convert, or None.
+
+    Returns:
+        Timezone-aware UTC ``datetime``, or None.
     """
     if dt is None:
         return None

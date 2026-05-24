@@ -1,3 +1,9 @@
+"""FastAPI dependencies for database sessions and authentication.
+
+Used with ``Depends()`` in route handlers throughout the API to inject
+database sessions and resolve the current authenticated staff member.
+"""
+
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
@@ -17,7 +23,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an async database session for the duration of a request."""
+    """Yield an async database session for the duration of a request.
+
+    Args:
+        None (injected by FastAPI).
+
+    Yields:
+        AsyncSession bound to the request lifecycle; closed in ``finally``.
+
+    Raises:
+        SQLAlchemyError: Logged and re-raised on connection failures.
+    """
     session = AsyncSessionLocal()
     try:
         yield session
@@ -32,7 +48,19 @@ async def get_current_staff(
     db: AsyncSession = Depends(get_db),
     token: str = Depends(oauth2_scheme),
 ) -> Staff:
-    """Resolve the authenticated staff member from a Bearer JWT."""
+    """Resolve the authenticated staff member from a Bearer JWT.
+
+    Args:
+        db: Async database session from ``get_db``.
+        token: OAuth2 bearer access token.
+
+    Returns:
+        Active Staff model for the token subject.
+
+    Raises:
+        InvalidTokenException: If the token is missing, invalid, expired, or
+            refers to an inactive or unknown staff account.
+    """
     payload = decode_access_token(token)
     if payload is None:
         raise InvalidTokenException()

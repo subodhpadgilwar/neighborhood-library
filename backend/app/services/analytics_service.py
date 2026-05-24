@@ -1,3 +1,9 @@
+"""Service layer for analytics business logic.
+
+Orchestrates between repository layer and API layer. All business rules and
+validation that requires database context live here.
+"""
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.timezone import (
@@ -16,8 +22,18 @@ from app.schemas.analytics import (
 
 
 class AnalyticsService:
+    """Business logic for dashboard and reporting aggregates."""
+
     @staticmethod
     async def get_genre_distribution(db: AsyncSession) -> list[GenreStats]:
+        """Compute per-genre book and copy counts with percentage share.
+
+        Args:
+            db: Async database session.
+
+        Returns:
+            List of GenreStats with totals and percentage of catalog.
+        """
         rows = await AnalyticsRepository.get_genre_distribution(db)
         total_books = sum(row["total_books"] for row in rows)
 
@@ -42,6 +58,18 @@ class AnalyticsService:
         db: AsyncSession,
         months: int = 6,
     ) -> list[MonthlyLendingStats]:
+        """Build monthly loan activity for the last N calendar months.
+
+        Missing months in the repository result are filled with zero counts.
+        Active loans per month are derived as total minus returned.
+
+        Args:
+            db: Async database session.
+            months: Number of months to include (default 6).
+
+        Returns:
+            Chronologically ordered list of MonthlyLendingStats.
+        """
         rows = await AnalyticsRepository.get_monthly_lending(db, months=months)
         rows_by_month = {month_key(row["month"]): row for row in rows}
 
@@ -83,6 +111,15 @@ class AnalyticsService:
         db: AsyncSession,
         limit: int = 5,
     ) -> list[TopBookStats]:
+        """Return the most-borrowed books with utilization rates.
+
+        Args:
+            db: Async database session.
+            limit: Maximum number of books to return (default 5).
+
+        Returns:
+            List of TopBookStats ranked by total borrows.
+        """
         rows = await AnalyticsRepository.get_top_borrowed_books(db, limit=limit)
         stats: list[TopBookStats] = []
         for row in rows:
@@ -110,5 +147,13 @@ class AnalyticsService:
 
     @staticmethod
     async def get_summary_stats(db: AsyncSession) -> SummaryStatsResponse:
+        """Return high-level counts for books, members, loans, and overdue items.
+
+        Args:
+            db: Async database session.
+
+        Returns:
+            SummaryStatsResponse with aggregate dashboard figures.
+        """
         data = await AnalyticsRepository.get_summary_stats(db)
         return SummaryStatsResponse(**data)

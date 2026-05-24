@@ -1,3 +1,8 @@
+"""Member model representing registered library members who can borrow books.
+
+Maps to the ``members`` table. Email is unique alongside the UUID primary key.
+"""
+
 import uuid
 from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
@@ -15,6 +20,22 @@ if TYPE_CHECKING:
 
 
 class Member(Base, AuditMixin):
+    """Represents a library member who can borrow books.
+
+    Email is unique and used as a natural identifier alongside the UUID primary
+    key for lookups and duplicate detection.
+
+    Attributes:
+        id: Primary key UUID.
+        name: Member display name.
+        email: Unique contact email.
+        phone: Optional phone number (normalized in Pydantic schemas).
+        address: Optional mailing address.
+        created_by_staff: ORM relationship to creating staff.
+        updated_by_staff: ORM relationship to last updating staff.
+        lending_records: All loans associated with this member.
+    """
+
     __tablename__ = "members"
 
     id: Mapped[uuid.UUID] = mapped_column(

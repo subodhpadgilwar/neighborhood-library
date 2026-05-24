@@ -1,3 +1,9 @@
+"""Async PostgreSQL database configuration using SQLAlchemy.
+
+Provides the async engine, session factory, declarative ``Base``, and the
+``get_db`` FastAPI dependency used by route handlers and services.
+"""
+
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -14,7 +20,7 @@ from app.core.logger import library_api
 
 
 class Base(DeclarativeBase):
-    """Declarative base for all SQLAlchemy models."""
+    """Declarative base class for all SQLAlchemy ORM models."""
 
 
 engine: AsyncEngine = create_async_engine(
@@ -32,10 +38,15 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """
-    FastAPI dependency that yields an async database session.
+    """Yield an async database session for the request lifecycle.
 
-    The session is always closed when the request finishes, including on error.
+    The session is always closed in ``finally``, including when errors occur.
+
+    Yields:
+        AsyncSession: Per-request database session.
+
+    Raises:
+        SQLAlchemyError: Logged and re-raised on connection failures.
     """
     session = AsyncSessionLocal()
     try:

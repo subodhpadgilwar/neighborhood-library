@@ -1,3 +1,9 @@
+"""LendingRecord model tracking all book borrowing and return operations.
+
+Maps to the ``lending_records`` table. Active loans are identified by
+``returned_at IS NULL`` throughout the codebase.
+"""
+
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
@@ -18,6 +24,28 @@ if TYPE_CHECKING:
 
 
 class LendingRecord(Base, AuditMixin):
+    """Represents a single lending transaction (borrow and optional return).
+
+    ``returned_at`` being NULL indicates the book is currently borrowed and not
+    yet returned. This is the primary signal for active loans in repositories
+    and services.
+
+    ``is_overdue`` is computed in the Pydantic schema layer — not stored in the
+    database — as: ``returned_at IS NULL AND due_date < now()``.
+
+    Attributes:
+        id: Primary key UUID.
+        book_id: Foreign key to the borrowed book.
+        member_id: Foreign key to the borrowing member.
+        borrowed_at: UTC timestamp when the loan was created.
+        due_date: UTC timestamp when the book is due back.
+        returned_at: UTC timestamp when returned, or None if still on loan.
+        book: ORM relationship to the Book entity.
+        member: ORM relationship to the Member entity.
+        created_by_staff: Staff who processed the borrow.
+        updated_by_staff: Staff who last updated the record (e.g. return).
+    """
+
     __tablename__ = "lending_records"
 
     id: Mapped[uuid.UUID] = mapped_column(

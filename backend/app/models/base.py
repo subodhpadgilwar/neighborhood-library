@@ -1,9 +1,7 @@
-"""
-Base model and audit mixin for SQLAlchemy entities.
+"""Base model configuration and AuditMixin for all SQLAlchemy ORM models.
 
-All models inherit from Base and AuditMixin. AuditMixin provides automatic
-created_at/updated_at timestamps in UTC and tracks which staff member made
-the change.
+Provides the shared audit columns (timestamps, staff attribution, soft delete)
+used by every domain model except Staff.
 """
 
 import uuid
@@ -20,7 +18,23 @@ __all__ = ["Base", "AuditMixin"]
 
 
 class AuditMixin:
-    """Reusable audit columns for created/updated timestamps and staff tracking."""
+    """Mixin that adds audit trail columns to ORM models.
+
+    All models except Staff inherit from this mixin. Provides automatic
+    timestamp tracking and staff attribution for every record change.
+
+    Staff does not use this mixin to avoid circular self-referencing foreign
+    keys (``created_by`` pointing back to the staff table).
+
+    Attributes:
+        created_at: UTC timestamp when the record was created.
+        updated_at: UTC timestamp of the last update; auto-updated by SQLAlchemy
+            on every change.
+        created_by: UUID of the staff member who created the record.
+        updated_by: UUID of the staff member who last updated the record.
+        is_active: Soft-delete flag. ``False`` means deactivated, not hard
+            deleted, preserving data integrity and lending history.
+    """
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

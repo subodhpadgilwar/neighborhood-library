@@ -1,3 +1,8 @@
+"""API routes for lending management.
+
+All routes protected by JWT authentication unless noted otherwise.
+"""
+
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -30,6 +35,7 @@ async def borrow_book(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> LendingResponse:
+    """Borrow a book for a member; optional custom due date in request body."""
     lending = await LendingService.borrow_book(
         db,
         data.book_id,
@@ -54,6 +60,7 @@ async def lending_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ) -> LendingHistoryResponse:
+    """Return paginated lending history with status, name, date, and sort filters."""
     filters = LendingFilterParams(
         status=status,  # type: ignore[arg-type]
         member_name=member_name,
@@ -73,6 +80,7 @@ async def list_active_loans(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> list[LendingResponse]:
+    """List all loans that have not yet been returned."""
     loans = await LendingService.get_all_active(db)
     return [LendingResponse.model_validate(loan) for loan in loans]
 
@@ -82,6 +90,7 @@ async def list_overdue_loans(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> list[LendingResponse]:
+    """List active loans past their due date."""
     loans = await LendingService.get_overdue(db)
     return [LendingResponse.model_validate(loan) for loan in loans]
 
@@ -93,6 +102,7 @@ async def update_due_date(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> LendingResponse:
+    """Update the due date on an active loan."""
     lending = await LendingService.update_due_date(
         db,
         lending_id,
@@ -108,5 +118,6 @@ async def return_book(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> LendingResponse:
+    """Mark a loan as returned and increment available copies."""
     lending = await LendingService.return_book(db, lending_id, current_staff.id)
     return LendingResponse.model_validate(lending)

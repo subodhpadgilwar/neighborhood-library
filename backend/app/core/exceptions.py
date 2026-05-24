@@ -1,9 +1,11 @@
-"""
-Custom HTTP exceptions for the Neighborhood Library API.
+"""Custom HTTP exceptions for the library API.
 
-Use these classes in services and repositories instead of raising raw
-HTTPException directly. They encode consistent status codes, messages,
-and headers so API behavior stays uniform and routes stay thin.
+Using custom exception classes instead of raw HTTPException provides:
+
+- Consistent error messages across the codebase
+- A single place to update error messages
+- Self-documenting code (``BookNotFoundException`` is clearer than HTTPException(404))
+- Easier testing and mocking in services
 """
 
 from fastapi import HTTPException, status
@@ -17,6 +19,8 @@ _BEARER_AUTH_HEADERS = {"WWW-Authenticate": "Bearer"}
 
 
 class BookNotFoundException(HTTPException):
+    """Raised when a book ID does not exist or is not found in the database."""
+
     def __init__(self, book_id: int | str | None = None) -> None:
         detail = (
             f"Book not found: {book_id}" if book_id is not None else "Book not found"
@@ -25,6 +29,8 @@ class BookNotFoundException(HTTPException):
 
 
 class MemberNotFoundException(HTTPException):
+    """Raised when a member ID does not exist or is not found in the database."""
+
     def __init__(self, member_id: int | str | None = None) -> None:
         detail = (
             f"Member not found: {member_id}"
@@ -35,6 +41,8 @@ class MemberNotFoundException(HTTPException):
 
 
 class LendingNotFoundException(HTTPException):
+    """Raised when a lending record ID does not exist in the database."""
+
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -43,6 +51,8 @@ class LendingNotFoundException(HTTPException):
 
 
 class StaffNotFoundException(HTTPException):
+    """Raised when a staff ID does not exist or is not found in the database."""
+
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -56,6 +66,8 @@ class StaffNotFoundException(HTTPException):
 
 
 class BookNotAvailableException(HTTPException):
+    """Raised when a borrow is attempted but no copies of the book are available."""
+
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -64,6 +76,8 @@ class BookNotAvailableException(HTTPException):
 
 
 class AlreadyBorrowedException(HTTPException):
+    """Raised when a member already has an active loan for the same book."""
+
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -72,6 +86,8 @@ class AlreadyBorrowedException(HTTPException):
 
 
 class AlreadyReturnedException(HTTPException):
+    """Raised when a return is attempted on a loan that is already returned."""
+
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -85,6 +101,8 @@ class AlreadyReturnedException(HTTPException):
 
 
 class DuplicateEmailException(HTTPException):
+    """Raised when creating or updating a record with an email that already exists."""
+
     def __init__(self, email: str) -> None:
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
@@ -93,6 +111,8 @@ class DuplicateEmailException(HTTPException):
 
 
 class DuplicateISBNException(HTTPException):
+    """Raised when creating or updating a book with an ISBN that already exists."""
+
     def __init__(self, isbn: str) -> None:
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
@@ -106,6 +126,8 @@ class DuplicateISBNException(HTTPException):
 
 
 class InvalidCredentialsException(HTTPException):
+    """Raised when login email or password does not match any staff account."""
+
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -115,6 +137,8 @@ class InvalidCredentialsException(HTTPException):
 
 
 class InvalidTokenException(HTTPException):
+    """Raised when a JWT is missing, invalid, or expired."""
+
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,

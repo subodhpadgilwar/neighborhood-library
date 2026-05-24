@@ -1,3 +1,8 @@
+"""API routes for staff management.
+
+All routes protected by JWT authentication unless noted otherwise.
+"""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -23,6 +28,7 @@ async def list_staff(
     current_staff: Staff = Depends(get_current_staff),
     include_inactive: bool = False,
 ) -> list[StaffResponse]:
+    """List staff accounts with optional inclusion of deactivated users."""
     staff_list = await StaffService.get_all(db, include_inactive=include_inactive)
     return [StaffResponse.model_validate(staff) for staff in staff_list]
 
@@ -33,6 +39,7 @@ async def create_staff(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Create a new staff account."""
     staff = await StaffService.create(db, data, current_staff)
     return StaffResponse.model_validate(staff)
 
@@ -43,6 +50,7 @@ async def change_own_password(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Change the authenticated staff member's own password."""
     staff = await StaffService.change_own_password(db, current_staff, data)
     return StaffResponse.model_validate(staff)
 
@@ -53,6 +61,7 @@ async def get_staff(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Get a single staff account by id."""
     staff = await StaffService.get_by_id(db, staff_id)
     return StaffResponse.model_validate(staff)
 
@@ -64,6 +73,7 @@ async def update_staff(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Update another staff member's profile fields."""
     staff = await StaffService.update(db, staff_id, data, current_staff)
     return StaffResponse.model_validate(staff)
 
@@ -74,6 +84,7 @@ async def delete_staff(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Deactivate a staff account; blocks default admin and self-deactivation."""
     staff = await StaffService.soft_delete(db, staff_id, current_staff)
     return StaffResponse.model_validate(staff)
 
@@ -84,6 +95,7 @@ async def restore_staff(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Restore a previously deactivated staff account."""
     staff = await StaffService.restore(db, staff_id, current_staff)
     return StaffResponse.model_validate(staff)
 
@@ -95,5 +107,6 @@ async def admin_change_password(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
 ) -> StaffResponse:
+    """Reset another staff member's password (admin action)."""
     staff = await StaffService.admin_change_password(db, staff_id, data, current_staff)
     return StaffResponse.model_validate(staff)

@@ -1,3 +1,9 @@
+"""Entry point for the Neighborhood Library API.
+
+Configures the FastAPI application, middleware, exception handlers, and
+startup/shutdown lifecycle hooks that seed the database on boot.
+"""
+
 import time
 from contextlib import asynccontextmanager
 from typing import Any
@@ -21,6 +27,17 @@ API_VERSION = "1.0.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage application startup and shutdown.
+
+    On startup, runs database seeders (default admin and sample books).
+    On shutdown, logs a clean exit message.
+
+    Args:
+        app: FastAPI application instance.
+
+    Yields:
+        Control to the running application between startup and shutdown.
+    """
     library_api.info("Starting Neighborhood Library API")
     library_api.info("Environment: %s", settings.app_env)
     library_api.info("Timezone: %s", settings.app_timezone)
@@ -54,11 +71,22 @@ app.add_middleware(
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log each HTTP request method, path, status code, and duration."""
+
     async def dispatch(
         self,
         request: Request,
         call_next: RequestResponseEndpoint,
     ) -> Response:
+        """Process a request and log timing metadata.
+
+        Args:
+            request: Incoming HTTP request.
+            call_next: Next middleware or route handler in the chain.
+
+        Returns:
+            HTTP response from downstream handlers.
+        """
         start = time.perf_counter()
         library_api.info("%s %s", request.method, request.url.path)
 
@@ -79,6 +107,14 @@ app.add_middleware(RequestLoggingMiddleware)
 
 
 def _format_validation_errors(exc: RequestValidationError) -> list[dict[str, str]]:
+    """Convert Pydantic validation errors into a flat field/message list.
+
+    Args:
+        exc: FastAPI request validation exception.
+
+    Returns:
+        List of dicts with ``field`` and ``message`` keys for JSON responses.
+    """
     errors: list[dict[str, str]] = []
     for error in exc.errors():
         location = error.get("loc", ())
@@ -96,6 +132,14 @@ def _format_validation_errors(exc: RequestValidationError) -> list[dict[str, str
 
 
 def _http_exception_message(detail: Any) -> str:
+    """Extract a string message from HTTPException detail payloads.
+
+    Args:
+        detail: ``HTTPException.detail`` value (str, dict, or other).
+
+    Returns:
+        Human-readable error message string.
+    """
     if isinstance(detail, str):
         return detail
     if isinstance(detail, dict):
@@ -110,6 +154,15 @@ async def request_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    """Convert Pydantic validation errors to a consistent JSON response format.
+
+    Args:
+        request: HTTP request that failed validation.
+        exc: Validation exception with field-level error details.
+
+    Returns:
+        JSONResponse with status 422 and structured ``errors`` list.
+    """
     library_api.warning(
         "Validation failed for %s %s: %s",
         request.method,
@@ -131,6 +184,15 @@ async def http_exception_handler(
     request: Request,
     exc: HTTPException,
 ) -> JSONResponse:
+    """Convert HTTPExceptions to a consistent JSON response format.
+
+    Args:
+        request: HTTP request that raised the exception.
+        exc: FastAPI HTTP exception with status code and detail.
+
+    Returns:
+        JSONResponse matching the API error envelope (``status``, ``message``).
+    """
     library_api.warning(
         "HTTP %s for %s %s: %s",
         exc.status_code,
@@ -152,6 +214,15 @@ async def sqlalchemy_exception_handler(
     request: Request,
     exc: SQLAlchemyError,
 ) -> JSONResponse:
+    """Handle SQLAlchemy errors without exposing raw database details to clients.
+
+    Args:
+        request: HTTP request during which the database error occurred.
+        exc: SQLAlchemy exception (logged with full traceback server-side).
+
+    Returns:
+        JSONResponse with status 500 and a generic database error message.
+    """
     library_api.error(
         "Database error on %s %s",
         request.method,
@@ -172,6 +243,15 @@ async def unhandled_exception_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
+    """Catch all unhandled exceptions and return a safe 500 response.
+
+    Args:
+        request: HTTP request during which the unexpected error occurred.
+        exc: Unhandled exception (logged with full traceback server-side).
+
+    Returns:
+        JSONResponse with status 500 and a generic error message.
+    """
     library_api.error(
         "Unexpected error on %s %s: %s",
         request.method,
@@ -190,6 +270,11 @@ async def unhandled_exception_handler(
 
 @app.get("/health")
 async def health_check() -> dict[str, str]:
+    """Return API health status and version for load balancers and monitoring.
+
+    Returns:
+        Dict with ``status`` (``ok``) and ``version`` strings.
+    """
     return {"status": "ok", "version": API_VERSION}
 
 

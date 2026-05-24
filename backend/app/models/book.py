@@ -1,3 +1,8 @@
+"""Book model representing physical books in the library collection.
+
+Maps to the ``books`` table. Tracks copy counts for O(1) availability checks.
+"""
+
 import uuid
 from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
@@ -15,6 +20,30 @@ if TYPE_CHECKING:
 
 
 class Book(Base, AuditMixin):
+    """Represents a book title in the library catalog.
+
+    ``copies_total`` is the permanent count of physical copies owned.
+    ``copies_available`` decrements on borrow and increments on return, enabling
+    O(1) availability checks without expensive ``COUNT`` queries on lending
+    records.
+
+    Database constraints ensure ``copies_available`` never goes negative and
+    ``copies_total`` is always at least 1.
+
+    Attributes:
+        id: Primary key UUID.
+        title: Book title.
+        author: Author name.
+        isbn: Optional 13-digit ISBN (unique when set).
+        genre: Optional genre label.
+        shelf_location: Optional shelf identifier for staff retrieval.
+        copies_total: Total physical copies owned.
+        copies_available: Copies currently available to borrow.
+        created_by_staff: ORM relationship to creating staff (loaded on demand).
+        updated_by_staff: ORM relationship to last updating staff.
+        lending_records: All lending transactions for this book.
+    """
+
     __tablename__ = "books"
     __table_args__ = (
         CheckConstraint("copies_available >= 0", name="ck_books_copies_available_nonneg"),
