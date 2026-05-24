@@ -1,12 +1,13 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logger import library_api
-from app.core.timezone import UTC, now_utc
+from app.config import settings
+from app.core.timezone import get_app_timezone, now_utc, start_of_month_local, subtract_months, to_utc
 from app.models.book import Book
 from app.models.lending import LendingRecord
 from app.models.member import Member
@@ -42,15 +43,12 @@ class AnalyticsRepository:
     @staticmethod
     async def get_monthly_lending(db: AsyncSession, months: int = 6) -> list[dict[str, Any]]:
         library_api.debug("AnalyticsRepository.get_monthly_lending months=%s", months)
-        month_bucket = func.date_trunc("month", LendingRecord.borrowed_at).label("month")
+        local_borrowed = func.timezone(settings.app_timezone, LendingRecord.borrowed_at)
+        month_bucket = func.date_trunc("month", local_borrowed).label("month")
         current_time = now_utc()
-        cutoff = _subtract_months(current_time, months - 1).replace(
-            day=1,
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
+        cutoff_local = subtract_months(start_of_month_local(current_time), months - 1)
+        cutoff = to_utc(cutoff_local)
+        assert cutoff is not None
 
         returned_expr = func.sum(
             case((LendingRecord.returned_at.is_not(None), 1), else_=0)
@@ -145,8 +143,16 @@ class AnalyticsRepository:
     async def get_summary_stats(db: AsyncSession) -> dict[str, int]:
         library_api.debug("AnalyticsRepository.get_summary_stats")
         current_time = now_utc()
-        today_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
+        app_tz = get_app_timezone()
+        today_start_local = current_time.astimezone(app_tz).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        today_end_local = today_start_local + timedelta(days=1)
+        today_start = today_start_local.astimezone(current_time.tzinfo)
+        today_end = today_end_local.astimezone(current_time.tzinfo)
 
         total_books_stmt = select(func.count(Book.id)).where(Book.is_active.is_(True))
         total_members_stmt = select(func.count(Member.id)).where(Member.is_active.is_(True))
@@ -203,12 +209,3 @@ class AnalyticsRepository:
             "loans_today": loans_today,
             "returns_today": returns_today,
         }
-
-
-def _subtract_months(dt: datetime, months: int) -> datetime:
-    year = dt.year
-    month = dt.month - months
-    while month <= 0:
-        month += 12
-        year -= 1
-    return dt.replace(year=year, month=month)

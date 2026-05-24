@@ -1,9 +1,12 @@
-from datetime import datetime
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.timezone import UTC, to_local
-from app.repositories.analytics_repo import AnalyticsRepository, _subtract_months
+from app.core.timezone import (
+    format_month_label,
+    month_key,
+    start_of_month_local,
+    subtract_months,
+)
+from app.repositories.analytics_repo import AnalyticsRepository
 from app.schemas.analytics import (
     GenreStats,
     MonthlyLendingStats,
@@ -40,27 +43,18 @@ class AnalyticsService:
         months: int = 6,
     ) -> list[MonthlyLendingStats]:
         rows = await AnalyticsRepository.get_monthly_lending(db, months=months)
-        rows_by_month = {
-            _normalize_month_key(row["month"]): row for row in rows
-        }
+        rows_by_month = {month_key(row["month"]): row for row in rows}
 
-        current = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        month_starts: list[datetime] = []
-        cursor = current
+        month_starts: list = []
+        cursor = start_of_month_local()
         for _ in range(months):
             month_starts.append(cursor)
-            cursor = _subtract_months(cursor, 1).replace(
-                day=1,
-                hour=0,
-                minute=0,
-                second=0,
-                microsecond=0,
-            )
+            cursor = subtract_months(cursor, 1)
         month_starts.sort()
 
         result: list[MonthlyLendingStats] = []
         for month_start in month_starts:
-            key = _normalize_month_key(month_start)
+            key = month_key(month_start)
             row = rows_by_month.get(
                 key,
                 {
@@ -72,11 +66,10 @@ class AnalyticsService:
             total_loans = int(row["total_loans"])
             returned_loans = int(row["returned_loans"])
             overdue_loans = int(row["overdue_loans"])
-            local_month = to_local(month_start)
-            assert local_month is not None
+            year, month = key
             result.append(
                 MonthlyLendingStats(
-                    month=local_month.strftime("%b %Y"),
+                    month=format_month_label(year, month),
                     total_loans=total_loans,
                     returned_loans=returned_loans,
                     overdue_loans=overdue_loans,
@@ -119,11 +112,3 @@ class AnalyticsService:
     async def get_summary_stats(db: AsyncSession) -> SummaryStatsResponse:
         data = await AnalyticsRepository.get_summary_stats(db)
         return SummaryStatsResponse(**data)
-
-
-def _normalize_month_key(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        value = UTC.localize(value)
-    else:
-        value = value.astimezone(UTC)
-    return value.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

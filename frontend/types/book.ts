@@ -4,6 +4,7 @@ export interface Book {
   author: string;
   isbn: string | null;
   genre: string | null;
+  shelf_location: string | null;
   copies_total: number;
   copies_available: number;
   is_active: boolean;
@@ -18,6 +19,7 @@ export interface BookCreate {
   author: string;
   isbn?: string;
   genre?: string;
+  shelf_location?: string;
   copies_total: number;
 }
 
@@ -26,5 +28,6 @@ export interface BookUpdate {
   author?: string;
   isbn?: string;
   genre?: string;
+  shelf_location?: string;
   copies_total?: number;
 }

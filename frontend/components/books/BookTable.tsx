@@ -86,6 +86,7 @@ export function BookTable({
           <TableHead>Author</TableHead>
           <TableHead>ISBN</TableHead>
           <TableHead>Genre</TableHead>
+          <TableHead className="max-w-[120px]">Shelf Location</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Available/Total</TableHead>
           <TableHead>Added By</TableHead>
@@ -126,6 +127,12 @@ export function BookTable({
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {book.genre ?? "—"}
+              </TableCell>
+              <TableCell
+                className="max-w-[120px] truncate text-muted-foreground"
+                title={book.shelf_location ?? undefined}
+              >
+                {book.shelf_location ?? "—"}
               </TableCell>
               <TableCell>
                 {!isActive ? (

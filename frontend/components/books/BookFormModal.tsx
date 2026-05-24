@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { LocationScanner } from "@/components/shared/LocationScanner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { bookService } from "@/services";
@@ -36,6 +37,7 @@ interface FormState {
   author: string;
   isbn: string;
   genre: string;
+  shelf_location: string;
   copies_total: string;
 }
 
@@ -44,6 +46,7 @@ const emptyForm: FormState = {
   author: "",
   isbn: "",
   genre: "",
+  shelf_location: "",
   copies_total: "1",
 };
 
@@ -53,6 +56,7 @@ function bookToForm(book: Book): FormState {
     author: book.author,
     isbn: book.isbn ?? "",
     genre: book.genre ?? "",
+    shelf_location: book.shelf_location ?? "",
     copies_total: String(book.copies_total),
   };
 }
@@ -116,6 +120,7 @@ export function BookFormModal({
       author: form.author.trim(),
       isbn: form.isbn.trim() || undefined,
       genre: form.genre.trim() || undefined,
+      shelf_location: form.shelf_location.trim() || undefined,
       copies_total: Number(form.copies_total),
     };
 
@@ -208,6 +213,15 @@ export function BookFormModal({
               id="book-genre"
               value={form.genre}
               onChange={(e) => updateField("genre", e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Shelf Location (optional)</Label>
+            <LocationScanner
+              value={form.shelf_location}
+              onChange={(value) => updateField("shelf_location", value)}
               disabled={isSubmitting}
             />
           </div>

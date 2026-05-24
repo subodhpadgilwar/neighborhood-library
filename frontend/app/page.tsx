@@ -1,10 +1,22 @@
 "use client";
 
-import { AlertTriangle, ArrowLeftRight, Plus, UserPlus, X } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeftRight,
+  BookOpen,
+  Plus,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { GenrePieChart } from "@/components/analytics/GenrePieChart";
+import { MonthlyLendingChart } from "@/components/analytics/MonthlyLendingChart";
+import { TopBooksChart } from "@/components/analytics/TopBooksChart";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { getLoanStatus } from "@/components/lending/loanUtils";
 import { LoanStatusBadge } from "@/components/lending/LoanStatusBadge";
@@ -30,27 +42,22 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
-import {
-  bookService,
-  lendingService,
-  memberService,
-} from "@/services";
-import type { Lending } from "@/types";
+import { analyticsService, lendingService } from "@/services";
+import type { Lending, SummaryStats } from "@/types";
 
 interface DashboardData {
-  booksCount: number;
-  membersCount: number;
-  activeLoansCount: number;
-  overdueCount: number;
+  summary: SummaryStats | null;
   recentLoans: Lending[];
 }
 
 interface StatCardProps {
   label: string;
   value: number | string;
+  subText?: string;
   accent: "blue" | "green" | "orange" | "red";
   pulse?: boolean;
-  badge?: number;
+  ringPulse?: boolean;
+  icon: ReactNode;
 }
 
 const accentStyles = {
@@ -60,25 +67,35 @@ const accentStyles = {
   red: "border-l-red-500 bg-red-50/60 dark:bg-red-950/30",
 } as const;
 
-function StatCard({ label, value, accent, pulse, badge }: StatCardProps) {
+function StatCard({
+  label,
+  value,
+  subText,
+  accent,
+  pulse,
+  ringPulse,
+  icon,
+}: StatCardProps) {
   return (
     <Card
       className={cn(
         "border-l-4 py-4 shadow-none",
         accentStyles[accent],
         pulse && "animate-pulse",
+        ringPulse && "ring-2 ring-red-400/70 ring-offset-2 dark:ring-red-500/50",
       )}
     >
       <CardContent className="flex items-start justify-between px-4 py-0">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-1 text-3xl font-semibold tracking-tight">{value}</p>
+          <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+            {value}
+          </p>
+          {subText ? (
+            <p className="mt-1 text-xs text-muted-foreground">{subText}</p>
+          ) : null}
         </div>
-        {badge !== undefined && badge > 0 ? (
-          <Badge variant="destructive" className="tabular-nums">
-            {badge}
-          </Badge>
-        ) : null}
+        <div className="text-muted-foreground">{icon}</div>
       </CardContent>
     </Card>
   );
@@ -114,10 +131,7 @@ export default function DashboardPage() {
       setError(null);
 
       const results = await Promise.allSettled([
-        bookService.getAll(),
-        memberService.getAll(),
-        lendingService.getAllActive(),
-        lendingService.getOverdue(),
+        analyticsService.getSummary(),
         lendingService.getHistory({
           limit: 5,
           sort_by: "borrowed_at",
@@ -129,25 +143,13 @@ export default function DashboardPage() {
         return;
       }
 
-      const labels = [
-        "books",
-        "members",
-        "active loans",
-        "overdue loans",
-        "recent activity",
-      ];
+      const labels = ["summary", "recent activity"];
       const errors: string[] = [];
 
-      const books =
-        results[0].status === "fulfilled" ? results[0].value : [];
-      const members =
-        results[1].status === "fulfilled" ? results[1].value : [];
-      const activeLoans =
-        results[2].status === "fulfilled" ? results[2].value : [];
-      const overdueLoans =
-        results[3].status === "fulfilled" ? results[3].value : [];
+      const summary =
+        results[0].status === "fulfilled" ? results[0].value : null;
       const historyResult =
-        results[4].status === "fulfilled" ? results[4].value : null;
+        results[1].status === "fulfilled" ? results[1].value : null;
 
       results.forEach((result, index) => {
         if (result.status === "rejected") {
@@ -159,14 +161,9 @@ export default function DashboardPage() {
         setError(errors.join(". ") + ".");
       }
 
-      const recentLoans = historyResult?.items ?? [];
-
       setData({
-        booksCount: books.length,
-        membersCount: members.length,
-        activeLoansCount: activeLoans.length,
-        overdueCount: overdueLoans.length,
-        recentLoans,
+        summary,
+        recentLoans: historyResult?.items ?? [],
       });
       setIsLoading(false);
     }
@@ -178,7 +175,8 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const overdueCount = data?.overdueCount ?? 0;
+  const summary = data?.summary;
+  const overdueCount = summary?.overdue_loans ?? 0;
   const showBanner = !bannerDismissed && !isLoading && overdueCount > 0;
 
   const overdueMessage = `${overdueCount} book(s) are overdue and need attention`;
@@ -218,29 +216,72 @@ export default function DashboardPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              label="Total Books"
-              value={data?.booksCount ?? 0}
+              label="Books"
+              value={summary?.total_books ?? 0}
+              subText={`${summary?.total_copies ?? 0} total copies`}
               accent="blue"
+              icon={<BookOpen className="size-8 opacity-60" aria-hidden />}
             />
             <StatCard
-              label="Total Members"
-              value={data?.membersCount ?? 0}
+              label="Members"
+              value={summary?.total_members ?? 0}
               accent="green"
+              icon={<Users className="size-8 opacity-60" aria-hidden />}
             />
             <StatCard
               label="Active Loans"
-              value={data?.activeLoansCount ?? 0}
+              value={summary?.active_loans ?? 0}
+              subText={`${summary?.loans_today ?? 0} borrowed today`}
               accent="orange"
+              icon={
+                <ArrowLeftRight className="size-8 opacity-60" aria-hidden />
+              }
             />
             <StatCard
-              label="Overdue Books"
-              value={data?.overdueCount ?? 0}
+              label="Overdue"
+              value={summary?.overdue_loans ?? 0}
+              subText={`${summary?.returns_today ?? 0} returned today`}
               accent="red"
               pulse={overdueCount > 0}
-              badge={overdueCount > 0 ? overdueCount : undefined}
+              ringPulse={overdueCount > 0}
+              icon={<AlertCircle className="size-8 opacity-60" aria-hidden />}
             />
           </div>
         )}
+
+        <div>
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">
+            Library Analytics
+          </h2>
+          <div className="grid gap-6 lg:grid-cols-5">
+            <Card className="lg:col-span-3">
+              <CardHeader>
+                <CardTitle>Lending Trends</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MonthlyLendingChart />
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Books by Genre</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GenrePieChart />
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Most Popular Books</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TopBooksChart />
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">

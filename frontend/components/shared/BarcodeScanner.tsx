@@ -33,6 +33,9 @@ interface BarcodeScannerProps {
   onClose: () => void;
   onScan: (result: string) => void;
   title?: string;
+  transformScan?: (raw: string) => string;
+  manualInputLabel?: string;
+  manualInputPlaceholder?: string;
 }
 
 export function BarcodeScanner({
@@ -40,6 +43,9 @@ export function BarcodeScanner({
   onClose,
   onScan,
   title = "Scan Barcode",
+  transformScan = normalizeISBNFromScan,
+  manualInputLabel = "Or enter ISBN manually:",
+  manualInputPlaceholder = "13-digit ISBN",
 }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -79,14 +85,14 @@ export function BarcodeScanner({
   }, [onClose, stopScanner]);
 
   const handleManualSubmit = useCallback(() => {
-    const normalized = normalizeISBNFromScan(manualISBN);
-    if (!normalized) {
+    const normalized = transformScan(manualISBN);
+    if (!normalized.trim()) {
       return;
     }
     stopScanner();
     onScan(normalized);
     handleClose();
-  }, [manualISBN, onScan, stopScanner, handleClose]);
+  }, [manualISBN, onScan, stopScanner, handleClose, transformScan]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -144,7 +150,7 @@ export function BarcodeScanner({
 
             if (result) {
               hasDetectedRef.current = true;
-              const text = normalizeISBNFromScan(result.getText());
+              const text = transformScan(result.getText());
               setStatus("detected");
               controls.stop();
               scannerControlsRef.current = null;
@@ -204,7 +210,7 @@ export function BarcodeScanner({
       cancelled = true;
       stopScanner();
     };
-  }, [isOpen, onScan, stopScanner]);
+  }, [isOpen, onScan, stopScanner, transformScan]);
 
   function renderStatusText() {
     if (status === "detected") {
@@ -289,21 +295,20 @@ export function BarcodeScanner({
 
           {showManualInput ? (
             <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-              <Label htmlFor="manual-isbn">Or enter ISBN manually:</Label>
+              <Label htmlFor="manual-isbn">{manualInputLabel}</Label>
               <div className="flex gap-2">
                 <Input
                   id="manual-isbn"
                   value={manualISBN}
                   onChange={(event) => setManualISBN(event.target.value)}
-                  placeholder="13-digit ISBN"
-                  inputMode="numeric"
+                  placeholder={manualInputPlaceholder}
                 />
                 <Button
                   type="button"
                   onClick={handleManualSubmit}
                   disabled={!manualISBN.trim()}
                 >
-                  Use This ISBN
+                  Use Value
                 </Button>
               </div>
             </div>

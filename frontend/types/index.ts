@@ -29,3 +29,10 @@ export type {
   ValidationError,
   PaginatedResponse,
 } from "./common";
+
+export type {
+  GenreStats,
+  MonthlyLendingStats,
+  TopBookStats,
+  SummaryStats,
+} from "./analytics";

@@ -95,7 +95,8 @@ function BooksPageContent() {
     return books.filter(
       (book) =>
         book.title.toLowerCase().includes(query) ||
-        book.author.toLowerCase().includes(query),
+        book.author.toLowerCase().includes(query) ||
+        (book.shelf_location?.toLowerCase().includes(query) ?? false),
     );
   }, [books, search]);
 
@@ -251,7 +252,7 @@ function BooksPageContent() {
         {error ? <ErrorMessage message={error} /> : null}
 
         {isLoading ? (
-          <LoadingSkeleton rows={6} columns={8} />
+          <LoadingSkeleton rows={6} columns={9} />
         ) : isEmpty ? (
           <EmptyState
             message="No books found"
