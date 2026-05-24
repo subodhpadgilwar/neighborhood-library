@@ -1,1 +1,131 @@
+from datetime import timedelta
+from uuid import UUID
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.logger import library_api
+from app.core.timezone import now_utc
+from app.models.lending import LendingRecord
+
+
+class LendingRepository:
+    @staticmethod
+    async def get_by_id(db: AsyncSession, lending_id: UUID) -> LendingRecord | None:
+        library_api.debug("LendingRepository.get_by_id lending_id=%s", lending_id)
+        result = await db.execute(
+            select(LendingRecord).where(LendingRecord.id == lending_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_active_loan(
+        db: AsyncSession,
+        book_id: UUID,
+        member_id: UUID,
+    ) -> LendingRecord | None:
+        library_api.debug(
+            "LendingRepository.get_active_loan book_id=%s member_id=%s",
+            book_id,
+            member_id,
+        )
+        result = await db.execute(
+            select(LendingRecord).where(
+                LendingRecord.book_id == book_id,
+                LendingRecord.member_id == member_id,
+                LendingRecord.returned_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_member(db: AsyncSession, member_id: UUID) -> list[LendingRecord]:
+        library_api.debug("LendingRepository.get_by_member member_id=%s", member_id)
+        result = await db.execute(
+            select(LendingRecord)
+            .where(LendingRecord.member_id == member_id)
+            .order_by(LendingRecord.borrowed_at.desc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_active_by_member(
+        db: AsyncSession,
+        member_id: UUID,
+    ) -> list[LendingRecord]:
+        library_api.debug(
+            "LendingRepository.get_active_by_member member_id=%s",
+            member_id,
+        )
+        result = await db.execute(
+            select(LendingRecord)
+            .where(
+                LendingRecord.member_id == member_id,
+                LendingRecord.returned_at.is_(None),
+            )
+            .order_by(LendingRecord.borrowed_at.desc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_all_active(db: AsyncSession) -> list[LendingRecord]:
+        library_api.debug("LendingRepository.get_all_active")
+        result = await db.execute(
+            select(LendingRecord).where(LendingRecord.returned_at.is_(None))
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_overdue(db: AsyncSession) -> list[LendingRecord]:
+        library_api.debug("LendingRepository.get_overdue")
+        current_time = now_utc()
+        result = await db.execute(
+            select(LendingRecord).where(
+                LendingRecord.returned_at.is_(None),
+                LendingRecord.due_date < current_time,
+            )
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def create_loan(
+        db: AsyncSession,
+        book_id: UUID,
+        member_id: UUID,
+        staff_id: UUID,
+    ) -> LendingRecord:
+        library_api.debug(
+            "LendingRepository.create_loan book_id=%s member_id=%s staff_id=%s",
+            book_id,
+            member_id,
+            staff_id,
+        )
+        borrowed_at = now_utc()
+        lending = LendingRecord(
+            book_id=book_id,
+            member_id=member_id,
+            borrowed_at=borrowed_at,
+            due_date=borrowed_at + timedelta(days=14),
+            created_by=staff_id,
+        )
+        db.add(lending)
+        await db.commit()
+        await db.refresh(lending)
+        return lending
+
+    @staticmethod
+    async def mark_returned(
+        db: AsyncSession,
+        lending: LendingRecord,
+        staff_id: UUID,
+    ) -> LendingRecord:
+        library_api.debug(
+            "LendingRepository.mark_returned lending_id=%s staff_id=%s",
+            lending.id,
+            staff_id,
+        )
+        lending.returned_at = now_utc()
+        lending.updated_by = staff_id
+        await db.commit()
+        await db.refresh(lending)
+        return lending
