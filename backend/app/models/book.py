@@ -30,6 +30,7 @@ class Book(Base, AuditMixin):
     author: Mapped[str] = mapped_column(String(255), nullable=False)
     isbn: Mapped[str | None] = mapped_column(String(13), unique=True, nullable=True, index=True)
     genre: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    shelf_location: Mapped[str | None] = mapped_column(String(100), nullable=True)
     copies_total: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     copies_available: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 

@@ -12,7 +12,18 @@ class BookBase(BaseModel):
     author: str = Field(min_length=1, max_length=255)
     isbn: Optional[str] = Field(default=None, pattern=r"^\d{13}$")
     genre: Optional[str] = Field(default=None, max_length=100)
+    shelf_location: Optional[str] = Field(default=None, max_length=100)
     copies_total: int = Field(ge=1, le=1000)
+
+    @field_validator("shelf_location", mode="before")
+    @classmethod
+    def strip_shelf_location(cls, value: object) -> object:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped if stripped else None
+        return value
 
 
 class BookCreate(BookBase):
@@ -34,7 +45,13 @@ class BookUpdate(BaseModel):
     author: Optional[str] = Field(default=None, min_length=1, max_length=255)
     isbn: Optional[str] = Field(default=None, pattern=r"^\d{13}$")
     genre: Optional[str] = Field(default=None, max_length=100)
+    shelf_location: Optional[str] = Field(default=None, max_length=100)
     copies_total: Optional[int] = Field(default=None, ge=1, le=1000)
+
+    @field_validator("shelf_location", mode="before")
+    @classmethod
+    def strip_shelf_location(cls, value: object) -> object:
+        return BookBase.strip_shelf_location(value)
 
 
 class BookResponse(BookBase):

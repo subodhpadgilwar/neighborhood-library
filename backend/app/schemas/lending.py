@@ -104,6 +104,14 @@ class LendingResponse(BaseModel):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
+    def book_shelf_location(self) -> str | None:
+        book = getattr(self, "book", None)
+        if book is None:
+            return None
+        return getattr(book, "shelf_location", None)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
     def member_name(self) -> str | None:
         member = getattr(self, "member", None)
         if member is None:
