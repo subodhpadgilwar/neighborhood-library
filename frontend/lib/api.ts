@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from "axios";
 
+import { removeToken } from "@/lib/auth";
 import type { ApiError } from "@/types";
 
 export const api = axios.create({
@@ -21,7 +22,7 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("library_token");
+      removeToken();
       window.location.href = "/login";
     }
 
