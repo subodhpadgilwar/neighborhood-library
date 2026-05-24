@@ -40,6 +40,7 @@ class BookUpdate(BaseModel):
 class BookResponse(BookBase):
     id: UUID
     copies_available: int
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 

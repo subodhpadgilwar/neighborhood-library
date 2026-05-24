@@ -48,7 +48,7 @@ async def get_current_staff(
 
     result = await db.execute(select(Staff).where(Staff.id == staff_id))
     staff = result.scalar_one_or_none()
-    if staff is None:
+    if staff is None or not staff.is_active:
         raise InvalidTokenException()
 
     return staff

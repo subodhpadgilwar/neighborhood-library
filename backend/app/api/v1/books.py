@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_staff, get_db
@@ -16,16 +16,18 @@ async def list_books(
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    include_inactive: bool = False,
 ) -> list[BookResponse]:
-    books = await BookService.get_all(db, skip=skip, limit=limit)
+    books = await BookService.get_all(
+        db,
+        skip=skip,
+        limit=limit,
+        include_inactive=include_inactive,
+    )
     return [BookResponse.model_validate(book) for book in books]
 
 
-@router.post(
-    "/",
-    response_model=BookResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/", response_model=BookResponse, status_code=201)
 async def create_book(
     data: BookCreate,
     db: AsyncSession = Depends(get_db),
@@ -55,10 +57,21 @@ async def update_book(
     return BookResponse.model_validate(book)
 
 
-@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{book_id}", response_model=BookResponse)
 async def delete_book(
     book_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
-) -> None:
-    await BookService.delete(db, book_id, current_staff.id)
+) -> BookResponse:
+    book = await BookService.soft_delete(db, book_id, current_staff.id)
+    return BookResponse.model_validate(book)
+
+
+@router.put("/{book_id}/restore", response_model=BookResponse)
+async def restore_book(
+    book_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_staff: Staff = Depends(get_current_staff),
+) -> BookResponse:
+    book = await BookService.restore(db, book_id, current_staff.id)
+    return BookResponse.model_validate(book)

@@ -19,7 +19,11 @@ async def authenticate_staff(
 ) -> Staff | None:
     """Authenticate staff credentials. Returns Staff if valid, otherwise None."""
     staff = await get_staff_by_email(db, email)
-    if staff is None or not verify_password(password, staff.hashed_password):
+    if (
+        staff is None
+        or not staff.is_active
+        or not verify_password(password, staff.hashed_password)
+    ):
         library_api.warning("Failed login attempt for: %s", email)
         return None
 

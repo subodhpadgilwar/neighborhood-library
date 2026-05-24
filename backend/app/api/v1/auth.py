@@ -3,11 +3,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_staff, get_db
-from app.core.exceptions import DuplicateEmailException, InvalidCredentialsException
-from app.core.security import create_access_token, hash_password
+from app.core.exceptions import InvalidCredentialsException
+from app.core.security import create_access_token
 from app.models.staff import Staff
-from app.schemas.auth import StaffCreate, StaffResponse, TokenResponse
-from app.services.auth_service import authenticate_staff, get_staff_by_email
+from app.schemas.auth import TokenResponse
+from app.schemas.staff import StaffCreate, StaffResponse
+from app.services.auth_service import authenticate_staff
+from app.services.staff_service import StaffService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -37,26 +39,14 @@ async def login(
 async def register(
     data: StaffCreate,
     db: AsyncSession = Depends(get_db),
-    _current_staff: Staff = Depends(get_current_staff),
-) -> Staff:
-    email = str(data.email)
-    existing = await get_staff_by_email(db, email)
-    if existing is not None:
-        raise DuplicateEmailException(email)
-
-    staff = Staff(
-        email=email,
-        hashed_password=hash_password(data.password),
-        full_name=data.full_name,
-    )
-    db.add(staff)
-    await db.commit()
-    await db.refresh(staff)
-    return staff
+    current_staff: Staff = Depends(get_current_staff),
+) -> StaffResponse:
+    staff = await StaffService.create(db, data, current_staff)
+    return StaffResponse.model_validate(staff)
 
 
 @router.get("/me", response_model=StaffResponse)
 async def get_me(
     current_staff: Staff = Depends(get_current_staff),
-) -> Staff:
-    return current_staff
+) -> StaffResponse:
+    return StaffResponse.model_validate(current_staff)

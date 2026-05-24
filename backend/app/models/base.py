@@ -9,7 +9,7 @@ the change.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy import Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,3 +43,4 @@ class AuditMixin:
         ForeignKey("staff.id"),
         nullable=True,
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

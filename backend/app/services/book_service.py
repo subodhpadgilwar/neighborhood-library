@@ -1,11 +1,13 @@
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BookNotFoundException, DuplicateISBNException
 from app.core.logger import library_api
 from app.models.book import Book
 from app.repositories.book_repo import BookRepository
+from app.repositories.lending_repo import LendingRepository
 from app.schemas.book import BookCreate, BookUpdate
 
 
@@ -15,12 +17,26 @@ class BookService:
         db: AsyncSession,
         skip: int = 0,
         limit: int = 100,
+        include_inactive: bool = False,
     ) -> list[Book]:
-        return await BookRepository.get_all(db, skip=skip, limit=limit)
+        return await BookRepository.get_all(
+            db,
+            skip=skip,
+            limit=limit,
+            include_inactive=include_inactive,
+        )
 
     @staticmethod
-    async def get_by_id(db: AsyncSession, book_id: UUID) -> Book:
-        book = await BookRepository.get_by_id(db, book_id)
+    async def get_by_id(
+        db: AsyncSession,
+        book_id: UUID,
+        include_inactive: bool = False,
+    ) -> Book:
+        book = await BookRepository.get_by_id(
+            db,
+            book_id,
+            include_inactive=include_inactive,
+        )
         if book is None:
             raise BookNotFoundException(book_id)
         return book
@@ -35,7 +51,7 @@ class BookService:
         book = await BookRepository.create(db, data)
         book.created_by = staff_id
         await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id)
+        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
         book = loaded if loaded is not None else book
         library_api.info("Book created: %s", book.title)
         return book
@@ -62,10 +78,28 @@ class BookService:
         return book
 
     @staticmethod
-    async def delete(db: AsyncSession, book_id: UUID, staff_id: UUID) -> None:
-        book = await BookRepository.get_by_id(db, book_id)
+    async def soft_delete(db: AsyncSession, book_id: UUID, staff_id: UUID) -> Book:
+        book = await BookRepository.get_by_id(db, book_id, include_inactive=False)
         if book is None:
             raise BookNotFoundException(book_id)
 
-        await BookRepository.delete(db, book)
-        library_api.info("Book deleted: %s by staff %s", book_id, staff_id)
+        active_loans = await LendingRepository.get_active_by_book(db, book_id)
+        if active_loans:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete book with {len(active_loans)} active loan(s)",
+            )
+
+        book = await BookRepository.soft_delete(db, book, staff_id)
+        library_api.info("Book soft deleted: %s by staff %s", book_id, staff_id)
+        return book
+
+    @staticmethod
+    async def restore(db: AsyncSession, book_id: UUID, staff_id: UUID) -> Book:
+        book = await BookRepository.get_by_id(db, book_id, include_inactive=True)
+        if book is None:
+            raise BookNotFoundException(book_id)
+
+        book = await BookRepository.restore(db, book, staff_id)
+        library_api.info("Book restored: %s by staff %s", book_id, staff_id)
+        return book

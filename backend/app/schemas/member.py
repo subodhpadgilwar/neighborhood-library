@@ -57,6 +57,7 @@ class MemberUpdate(BaseModel):
 
 class MemberResponse(MemberBase):
     id: UUID
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 

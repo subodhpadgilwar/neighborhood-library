@@ -30,6 +30,20 @@ class LendingRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_active_by_book(
+        db: AsyncSession,
+        book_id: UUID,
+    ) -> list[LendingRecord]:
+        library_api.debug("LendingRepository.get_active_by_book book_id=%s", book_id)
+        result = await db.execute(
+            select(LendingRecord).where(
+                LendingRecord.book_id == book_id,
+                LendingRecord.returned_at.is_(None),
+            )
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def get_active_loan(
         db: AsyncSession,
         book_id: UUID,
