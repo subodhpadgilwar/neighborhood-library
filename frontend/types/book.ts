@@ -6,6 +6,7 @@ export interface Book {
   genre: string | null;
   copies_total: number;
   copies_available: number;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
   created_by: string | null;

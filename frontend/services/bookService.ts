@@ -1,9 +1,13 @@
 import { api } from "@/lib/api";
 import type { Book, BookCreate, BookUpdate } from "@/types";
 
-export async function getAll(skip = 0, limit = 100): Promise<Book[]> {
+export async function getAll(
+  skip = 0,
+  limit = 100,
+  includeInactive = false,
+): Promise<Book[]> {
   const { data } = await api.get<Book[]>("/books", {
-    params: { skip, limit },
+    params: { skip, limit, include_inactive: includeInactive },
   });
   return data;
 }
@@ -23,6 +27,12 @@ export async function update(id: string, book: BookUpdate): Promise<Book> {
   return data;
 }
 
-export async function deleteBook(id: string): Promise<void> {
-  await api.delete(`/books/${id}`);
+export async function deactivate(id: string): Promise<Book> {
+  const { data } = await api.delete<Book>(`/books/${id}`);
+  return data;
+}
+
+export async function restore(id: string): Promise<Book> {
+  const { data } = await api.put<Book>(`/books/${id}/restore`);
+  return data;
 }

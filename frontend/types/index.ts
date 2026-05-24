@@ -11,6 +11,14 @@ export type { Member, MemberCreate, MemberUpdate } from "./member";
 export type { Lending, BorrowRequest } from "./lending";
 
 export type {
+  Staff,
+  StaffCreate,
+  StaffUpdate,
+  ChangePasswordRequest,
+  AdminChangePasswordRequest,
+} from "./staff";
+
+export type {
   ApiError,
   ValidationError,
   PaginatedResponse,

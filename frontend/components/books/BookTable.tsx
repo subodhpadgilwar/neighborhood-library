@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Pencil } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, RefreshCw, UserX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ interface BookTableProps {
   sortDirection: TitleSortDirection;
   onSortChange: () => void;
   onEdit: (book: Book) => void;
+  onDeactivate: (book: Book) => void;
+  onRestore: (book: Book) => void;
 }
 
 function AvailabilityBadge({
@@ -60,6 +62,8 @@ export function BookTable({
   sortDirection,
   onSortChange,
   onEdit,
+  onDeactivate,
+  onRestore,
 }: BookTableProps) {
   return (
     <Table>
@@ -80,48 +84,101 @@ export function BookTable({
           <TableHead>Author</TableHead>
           <TableHead>ISBN</TableHead>
           <TableHead>Genre</TableHead>
+          <TableHead>Status</TableHead>
           <TableHead>Available/Total</TableHead>
           <TableHead>Added By</TableHead>
-          <TableHead className="w-[80px] text-right">Actions</TableHead>
+          <TableHead className="w-[120px] text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {books.map((book) => (
-          <TableRow key={book.id}>
-            <TableCell className="max-w-[200px] truncate font-medium">
-              {book.title}
-            </TableCell>
-            <TableCell className="max-w-[160px] truncate">
-              {book.author}
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {book.isbn ?? "—"}
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {book.genre ?? "—"}
-            </TableCell>
-            <TableCell>
-              <AvailabilityBadge
-                available={book.copies_available}
-                total={book.copies_total}
-              />
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {book.created_by ?? "—"}
-            </TableCell>
-            <TableCell className="text-right">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => onEdit(book)}
-                aria-label={`Edit ${book.title}`}
+        {books.map((book) => {
+          const isActive = book.is_active;
+
+          return (
+            <TableRow
+              key={book.id}
+              className={cn(!isActive && "opacity-60")}
+            >
+              <TableCell
+                className={cn(
+                  "max-w-[200px] truncate font-medium",
+                  !isActive && "text-muted-foreground line-through",
+                )}
               >
-                <Pencil className="size-4" />
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
+                {book.title}
+              </TableCell>
+              <TableCell
+                className={cn(
+                  "max-w-[160px] truncate",
+                  !isActive && "text-muted-foreground",
+                )}
+              >
+                {book.author}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {book.isbn ?? "—"}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {book.genre ?? "—"}
+              </TableCell>
+              <TableCell>
+                {!isActive ? (
+                  <Badge
+                    variant="destructive"
+                    className="bg-destructive/15 hover:bg-destructive/15"
+                  >
+                    Inactive
+                  </Badge>
+                ) : null}
+              </TableCell>
+              <TableCell>
+                <AvailabilityBadge
+                  available={book.copies_available}
+                  total={book.copies_total}
+                />
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {book.created_by ?? "—"}
+              </TableCell>
+              <TableCell className="text-right">
+                {isActive ? (
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => onEdit(book)}
+                      aria-label={`Edit ${book.title}`}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => onDeactivate(book)}
+                      aria-label={`Deactivate ${book.title}`}
+                    >
+                      <UserX className="size-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-emerald-600 hover:text-emerald-600"
+                    onClick={() => onRestore(book)}
+                    aria-label={`Restore ${book.title}`}
+                  >
+                    <RefreshCw className="size-4" />
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

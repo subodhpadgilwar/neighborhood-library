@@ -39,8 +39,16 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
   const [apiError, setApiError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
+  const activeMembers = useMemo(
+    () => members.filter((member) => member.is_active),
+    [members],
+  );
+
   const availableBooks = useMemo(
-    () => books.filter((book) => book.copies_available > 0),
+    () =>
+      books.filter(
+        (book) => book.is_active && book.copies_available > 0,
+      ),
     [books],
   );
 
@@ -133,7 +141,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
           <div className="space-y-2">
             <Label>Member</Label>
             <SearchableSelect
-              items={members}
+              items={activeMembers}
               value={selectedMember}
               onChange={setSelectedMember}
               getKey={(m) => m.id}
