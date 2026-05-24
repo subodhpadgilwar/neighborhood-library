@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ActiveLoansTable } from "@/components/lending/ActiveLoansTable";
 import { BorrowModal } from "@/components/lending/BorrowModal";
 import { OverdueTable } from "@/components/lending/OverdueTable";
+import { UpdateDueDateModal } from "@/components/lending/UpdateDueDateModal";
 import { ErrorMessage } from "@/components/shared/ErrorMessage";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,9 @@ function LendingPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
+  const [selectedLending, setSelectedLending] = useState<Lending | null>(null);
+  const [isUpdateDueDateModalOpen, setIsUpdateDueDateModalOpen] =
+    useState(false);
   const [tab, setTab] = useState(
     searchParams.get("tab") === "overdue" ? "overdue" : "active",
   );
@@ -70,6 +74,17 @@ function LendingPageContent() {
 
   const overdueCount = overdueLoans.length;
 
+  function handleEditDueDate(lending: Lending) {
+    setSelectedLending(lending);
+    setIsUpdateDueDateModalOpen(true);
+  }
+
+  function handleDueDateUpdateSuccess() {
+    setIsUpdateDueDateModalOpen(false);
+    setSelectedLending(null);
+    void loadLoans();
+  }
+
   return (
     <AppLayout title="Lending">
       <div className="space-y-6">
@@ -108,6 +123,7 @@ function LendingPageContent() {
               <ActiveLoansTable
                 loans={activeLoans}
                 onReturn={() => void loadLoans()}
+                onEditDueDate={handleEditDueDate}
               />
             )}
           </TabsContent>
@@ -127,6 +143,18 @@ function LendingPageContent() {
         onOpenChange={setBorrowModalOpen}
         onSuccess={() => void loadLoans()}
       />
+
+      {selectedLending ? (
+        <UpdateDueDateModal
+          isOpen={isUpdateDueDateModalOpen}
+          onClose={() => {
+            setIsUpdateDueDateModalOpen(false);
+            setSelectedLending(null);
+          }}
+          onSuccess={handleDueDateUpdateSuccess}
+          lending={selectedLending}
+        />
+      ) : null}
     </AppLayout>
   );
 }

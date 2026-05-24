@@ -14,4 +14,9 @@ export interface Lending {
 export interface BorrowRequest {
   book_id: string;
   member_id: string;
+  due_date?: string;
+}
+
+export interface UpdateDueDateRequest {
+  due_date: string;
 }

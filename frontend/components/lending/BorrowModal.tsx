@@ -1,9 +1,11 @@
 "use client";
 
+import { startOfDay } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { formatLoanDate } from "@/components/lending/loanUtils";
 import { SearchableSelect } from "@/components/lending/SearchableSelect";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +16,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  dateInputToApiIso,
+  defaultDueDateFromToday,
+  formatDate,
+  formatDateInputValue,
+  isCalendarDayBefore,
+} from "@/lib/dateUtils";
+import { cn } from "@/lib/utils";
 import { bookService, lendingService, memberService } from "@/services";
 import type { Book, Member } from "@/types";
 
@@ -34,10 +45,17 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
   const [books, setBooks] = useState<Book[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [dueDateInput, setDueDateInput] = useState("");
+  const [dueDateError, setDueDateError] = useState<string | null>(null);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
+
+  const todayInput = formatDateInputValue(startOfDay(new Date()));
+  const defaultDueDateLabel = formatDate(
+    defaultDueDateFromToday(14).toISOString(),
+  );
 
   const activeMembers = useMemo(
     () => members.filter((member) => member.is_active),
@@ -46,9 +64,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
 
   const availableBooks = useMemo(
     () =>
-      books.filter(
-        (book) => book.is_active && book.copies_available > 0,
-      ),
+      books.filter((book) => book.is_active && book.copies_available > 0),
     [books],
   );
 
@@ -59,6 +75,8 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
 
     setSelectedMember(null);
     setSelectedBook(null);
+    setDueDateInput("");
+    setDueDateError(null);
     setApiError(null);
     setFieldError(null);
 
@@ -93,6 +111,19 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
     };
   }, [open]);
 
+  function validateDueDate(): boolean {
+    if (!dueDateInput) {
+      setDueDateError(null);
+      return true;
+    }
+    if (isCalendarDayBefore(dueDateInput, todayInput)) {
+      setDueDateError("Due date cannot be in the past");
+      return false;
+    }
+    setDueDateError(null);
+    return true;
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFieldError(null);
@@ -103,15 +134,23 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
       return;
     }
 
+    if (!validateDueDate()) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await lendingService.borrowBook({
+      const lending = await lendingService.borrowBook({
         member_id: selectedMember.id,
         book_id: selectedBook.id,
+        ...(dueDateInput ? { due_date: dateInputToApiIso(dueDateInput) } : {}),
       });
-      toast.success("Book borrowed successfully");
+      toast.success(
+        `Book borrowed successfully. Due: ${formatLoanDate(lending.due_date)}`,
+      );
       setSelectedMember(null);
       setSelectedBook(null);
+      setDueDateInput("");
       setFieldError(null);
       onOpenChange(false);
       onSuccess();
@@ -196,6 +235,34 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
                 </span>
               )}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="borrow-due-date">Due Date (optional)</Label>
+            <Input
+              id="borrow-due-date"
+              type="date"
+              min={todayInput}
+              value={dueDateInput}
+              onChange={(e) => {
+                setDueDateInput(e.target.value);
+                setDueDateError(null);
+                setApiError(null);
+              }}
+              disabled={isSubmitting}
+              className={cn(
+                "w-full",
+                "[&::-webkit-calendar-picker-indicator]:cursor-pointer",
+              )}
+              aria-invalid={Boolean(dueDateError)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave empty to use default 14-day period (due: {defaultDueDateLabel}
+              )
+            </p>
+            {dueDateError ? (
+              <p className="text-xs text-destructive">{dueDateError}</p>
+            ) : null}
           </div>
 
           {fieldError ? (

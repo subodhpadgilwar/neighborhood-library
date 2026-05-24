@@ -20,3 +20,13 @@ export async function returnBook(lendingId: string): Promise<Lending> {
   const { data } = await api.put<Lending>(`/lending/${lendingId}/return`);
   return data;
 }
+
+export async function updateDueDate(
+  lendingId: string,
+  dueDate: string,
+): Promise<Lending> {
+  const { data } = await api.put<Lending>(`/lending/${lendingId}/due-date`, {
+    due_date: dueDate,
+  });
+  return data;
+}

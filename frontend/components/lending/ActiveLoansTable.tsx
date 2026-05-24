@@ -1,5 +1,6 @@
 "use client";
 
+import { Calendar } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -22,9 +23,14 @@ import type { Lending } from "@/types";
 interface ActiveLoansTableProps {
   loans: Lending[];
   onReturn: () => void;
+  onEditDueDate: (lending: Lending) => void;
 }
 
-export function ActiveLoansTable({ loans, onReturn }: ActiveLoansTableProps) {
+export function ActiveLoansTable({
+  loans,
+  onReturn,
+  onEditDueDate,
+}: ActiveLoansTableProps) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [returningId, setReturningId] = useState<string | null>(null);
 
@@ -60,13 +66,14 @@ export function ActiveLoansTable({ loans, onReturn }: ActiveLoansTableProps) {
           <TableHead>Member</TableHead>
           <TableHead>Borrowed Date</TableHead>
           <TableHead>Due Date</TableHead>
-          <TableHead>Status</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {loans.map((loan) => {
           const isReturning = returningId === loan.id;
+          const isActive = loan.returned_at === null;
+
           return (
             <TableRow key={loan.id}>
               <TableCell className="font-medium">{loan.book_title}</TableCell>
@@ -81,32 +88,46 @@ export function ActiveLoansTable({ loans, onReturn }: ActiveLoansTableProps) {
               </TableCell>
               <TableCell>{formatLoanDate(loan.borrowed_at)}</TableCell>
               <TableCell>{formatLoanDate(loan.due_date)}</TableCell>
-              <TableCell>
-                <LoanStatusBadge status={getLoanStatus(loan)} />
-              </TableCell>
               <TableCell className="text-right">
-                <ConfirmPopover
-                  message="Are you sure?"
-                  open={confirmingId === loan.id}
-                  onOpenChange={(open) => {
-                    if (!open) {
-                      setConfirmingId(null);
-                    }
-                  }}
-                  onCancel={() => setConfirmingId(null)}
-                  onConfirm={() => handleReturn(loan.id)}
-                  isLoading={isReturning}
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isReturning}
-                    onClick={() => setConfirmingId(loan.id)}
-                  >
-                    Return Book
-                  </Button>
-                </ConfirmPopover>
+                <div className="flex items-center justify-end gap-2">
+                  <LoanStatusBadge status={getLoanStatus(loan)} />
+                  {isActive ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => onEditDueDate(loan)}
+                        title="Update due date"
+                        aria-label={`Update due date for ${loan.book_title}`}
+                      >
+                        <Calendar className="size-4" />
+                      </Button>
+                      <ConfirmPopover
+                        message="Are you sure?"
+                        open={confirmingId === loan.id}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setConfirmingId(null);
+                          }
+                        }}
+                        onCancel={() => setConfirmingId(null)}
+                        onConfirm={() => handleReturn(loan.id)}
+                        isLoading={isReturning}
+                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isReturning}
+                          onClick={() => setConfirmingId(loan.id)}
+                        >
+                          Return Book
+                        </Button>
+                      </ConfirmPopover>
+                    </>
+                  ) : null}
+                </div>
               </TableCell>
             </TableRow>
           );
