@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Pencil, RefreshCw, UserX } from "lucide-react";
+import { ArrowDown, ArrowUp, BookX, Pencil, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -173,7 +173,7 @@ export function BookTable({
                       onClick={() => onDeactivate(book)}
                       aria-label={`Deactivate ${book.title}`}
                     >
-                      <UserX className="size-4" />
+                      <BookX className="size-4" />
                     </Button>
                   </div>
                 ) : (
