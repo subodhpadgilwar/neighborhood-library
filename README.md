@@ -1,20 +1,60 @@
-# Neighborhood Library API
+# Neighborhood Library
 
 ## Overview
 
-The Neighborhood Library API is a REST backend for managing a community library: cataloging books, registering members, and tracking borrow/return activity. Staff authenticate with JWT tokens to perform protected operations, while public endpoints allow browsing the catalog without signing in.
+Neighborhood Library is a full-stack application for managing a community library: cataloging books, registering members, and tracking borrow/return activity. Staff use a web portal with JWT authentication; the REST API powers all data operations.
 
-The service is built for clarity and maintainability using async Python, PostgreSQL, and Docker-first deployment.
+The backend is built for clarity and maintainability using async Python, PostgreSQL, and Docker-first deployment. The frontend is a Next.js staff portal with shadcn/ui.
 
 ## Tech Stack
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
 | Backend | FastAPI, Uvicorn | Async HTTP API and ASGI server |
+| Frontend | Next.js (App Router), shadcn/ui, TypeScript | Staff web portal |
 | Database | PostgreSQL 15, SQLAlchemy 2 (async), asyncpg | Persistent storage and ORM access |
 | Auth | python-jose, passlib (bcrypt), OAuth2 Bearer | JWT access tokens and password hashing |
 | Migrations | Alembic | Versioned database schema changes |
 | Containerization | Docker, Docker Compose | Local development and deployment |
+
+## Frontend
+
+- Next.js 14 with App Router
+- shadcn/ui component library
+- TypeScript throughout
+- Axios with JWT interceptors
+
+## Pages
+
+| Page | Route | Description |
+|------|-------|-------------|
+| Login | `/login` | Staff authentication |
+| Dashboard | `/` | Stats, overdue alerts, recent activity |
+| Books | `/books` | Manage library books |
+| Members | `/members` | Manage library members |
+| Lending | `/lending` | Borrow and return operations |
+
+## Default Login
+
+| Field | Value |
+|-------|-------|
+| Email | `admin@library.com` |
+| Password | `Admin@123` |
+
+⚠️ Change password after first login
+
+## Testing the App
+
+Step-by-step manual test flow:
+
+1. Login with default credentials
+2. Dashboard shows 10 seeded books stats
+3. Register a test member
+4. Go to Lending → Borrow a book for that member
+5. Dashboard shows active loan
+6. Return the book
+7. Try borrowing a book with 0 copies → should show error
+8. Check overdue tab (will be empty on fresh install)
 
 ## Architecture
 
@@ -36,9 +76,16 @@ Request → API Layer → Service Layer → Repository Layer → PostgreSQL
 
 ```
 neighborhood-library/
-├── docker-compose.yml          # Postgres + backend services
+├── docker-compose.yml          # Postgres + backend + frontend services
 ├── .env.example                # Pointer to backend environment setup
 ├── README.md
+├── frontend/                   # Next.js staff portal
+│   ├── Dockerfile
+│   ├── app/                    # App Router pages
+│   ├── components/             # UI and feature components
+│   ├── lib/                    # API client, auth, utilities
+│   ├── services/               # API service layer
+│   └── types/                  # TypeScript types
 └── backend/
     ├── Dockerfile              # Production/dev container image
     ├── requirements.txt        # Python dependencies
@@ -79,9 +126,19 @@ neighborhood-library/
    ```bash
    docker compose up --build
    ```
-5. Open interactive API docs at [http://localhost:8000/docs](http://localhost:8000/docs).
+5. Open the staff portal at [http://localhost:3000](http://localhost:3000) and API docs at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 The backend container runs `alembic upgrade head` before starting Uvicorn. Postgres must become healthy before the API starts.
+
+### Frontend environment
+
+For local development (without Docker), create `frontend/.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+When using Docker Compose, the frontend image is built with `NEXT_PUBLIC_API_URL=http://localhost:8000` so the browser can reach the API on the host-mapped port.
 
 ## Manual Setup (Without Docker)
 

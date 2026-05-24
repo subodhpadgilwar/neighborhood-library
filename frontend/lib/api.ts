@@ -3,8 +3,11 @@ import axios, { type AxiosError } from "axios";
 import { removeToken } from "@/lib/auth";
 import type { ApiError } from "@/types";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 export const api = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_API_URL}/api/v1`,
+  baseURL: `${API_BASE_URL}/api/v1`,
   headers: { "Content-Type": "application/json" },
 });
 
