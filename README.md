@@ -38,8 +38,8 @@ The backend is built for clarity and maintainability using async Python, Postgre
 
 | Field | Value |
 |-------|-------|
-| Email | `admin@library.com` |
-| Password | `Admin@123` |
+| Email | `subodh@numinolabs.com` |
+| Password | `NuminoLabs@2026` |
 
 ⚠️ Change password after first login
 
