@@ -116,19 +116,51 @@ neighborhood-library/
 
 ## Quick Start (Docker — Recommended)
 
-1. Clone the repository.
-2. Copy the environment template:
-   ```bash
-   cp backend/.env.example backend/.env
-   ```
-3. Edit `backend/.env` with your values (database credentials, `SECRET_KEY`, admin account).
-4. Start the stack:
-   ```bash
-   docker compose up --build
-   ```
-5. Open the staff portal at [http://localhost:3000](http://localhost:3000) and API docs at [http://localhost:8000/docs](http://localhost:8000/docs).
+> **First run note:** The initial build takes
+> approximately 5-10 minutes depending on your
+> internet speed. Docker needs to pull base images
+> (PostgreSQL, Python, Node.js) and install all
+> dependencies. Subsequent starts take ~30 seconds.
 
-The backend container runs `alembic upgrade head` before starting Uvicorn. Postgres must become healthy before the API starts.
+Prerequisites:
+- Docker Desktop installed and running
+
+Steps:
+1. Clone the repository
+   git clone https://github.com/you/neighborhood-library.git
+   cd neighborhood-library
+
+2. Set up environment
+   cp backend/.env.example backend/.env
+   # Edit backend/.env — change SECRET_KEY at minimum
+
+3. Start everything
+   docker-compose up --build
+
+   You will see logs from three services:
+   [postgres]  — database starting up
+   [backend]   — running migrations, seeding data
+   [frontend]  — building Next.js app
+
+   App is ready when you see:
+   "API is ready" in backend logs
+   "Ready on http://localhost:3000" in frontend logs
+
+4. Access the app
+   Frontend:  http://localhost:3000
+   API Docs:  http://localhost:8000/docs
+
+5. Login with default credentials
+   Email:    subodh@numinolabs.com
+   Password: NuminoLabs@2026
+   ⚠️ Change password after first login
+
+## Subsequent Starts
+
+Once built, no need for --build flag:
+   docker-compose up
+
+Stops in ~5 seconds, starts in ~30 seconds.
 
 ### Frontend environment
 
