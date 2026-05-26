@@ -1,18 +1,9 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/shared/FormDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { memberService } from "@/services";
@@ -150,20 +141,18 @@ export function MemberFormModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Edit Member" : "Register Member"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Update member contact details."
-              : "Add a new library member."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEdit ? "Edit Member" : "Register Member"}
+      description={
+        isEdit ? "Update member contact details." : "Add a new library member."
+      }
+      submitLabel={isEdit ? "Save Changes" : "Register"}
+      isSubmitting={isSubmitting}
+      apiError={apiError}
+      onSubmit={handleSubmit}
+    >
           <div className="space-y-2">
             <Label htmlFor="member-name">
               Name <span className="text-destructive">*</span>
@@ -223,36 +212,6 @@ export function MemberFormModal({
             />
           </div>
 
-          {apiError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {apiError}
-            </p>
-          ) : null}
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Loading...
-                </>
-              ) : isEdit ? (
-                "Save Changes"
-              ) : (
-                "Register"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }

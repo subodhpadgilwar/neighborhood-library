@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { apiPaths } from "@/lib/apiPaths";
 import type {
   GenreStats,
   MonthlyLendingStats,
@@ -7,12 +8,14 @@ import type {
 } from "@/types";
 
 export async function getSummary(): Promise<SummaryStats> {
-  const { data } = await api.get<SummaryStats>("/analytics/summary");
+  const { data } = await api.get<SummaryStats>(apiPaths.analytics.summary);
   return data;
 }
 
 export async function getGenreDistribution(): Promise<GenreStats[]> {
-  const { data } = await api.get<GenreStats[]>("/analytics/genre-distribution");
+  const { data } = await api.get<GenreStats[]>(
+    apiPaths.analytics.genreDistribution,
+  );
   return data;
 }
 
@@ -20,14 +23,14 @@ export async function getMonthlyLending(
   months = 6,
 ): Promise<MonthlyLendingStats[]> {
   const { data } = await api.get<MonthlyLendingStats[]>(
-    "/analytics/monthly-lending",
+    apiPaths.analytics.monthlyLending,
     { params: { months } },
   );
   return data;
 }
 
 export async function getTopBooks(limit = 5): Promise<TopBookStats[]> {
-  const { data } = await api.get<TopBookStats[]>("/analytics/top-books", {
+  const { data } = await api.get<TopBookStats[]>(apiPaths.analytics.topBooks, {
     params: { limit },
   });
   return data;

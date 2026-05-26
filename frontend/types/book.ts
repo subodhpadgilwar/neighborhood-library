@@ -1,3 +1,5 @@
+import type { PaginatedResponse } from "@/types/common";
+
 export interface Book {
   id: string;
   title: string;
@@ -31,3 +33,5 @@ export interface BookUpdate {
   shelf_location?: string;
   copies_total?: number;
 }
+
+export type BookListResponse = PaginatedResponse<Book>;

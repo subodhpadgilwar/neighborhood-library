@@ -111,8 +111,8 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
       setIsLoadingOptions(true);
       try {
         const [membersData, booksData] = await Promise.all([
-          memberService.getAll(0, 1000),
-          bookService.getAll(0, 1000),
+          memberService.getAll(1, 1000),
+          bookService.getAll(1, 1000),
         ]);
         if (!cancelled) {
           setMembers(membersData);

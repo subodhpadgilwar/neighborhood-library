@@ -5,13 +5,9 @@ import { ArrowDown, ArrowUp, BookX, Pencil, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  DataTable,
+  type DataTableColumn,
+} from "@/components/shared/DataTable";
 import { cn } from "@/lib/utils";
 import type { Book } from "@/types";
 
@@ -67,132 +63,149 @@ export function BookTable({
   onDeactivate,
   onRestore,
 }: BookTableProps) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>
-            <button
+  const columns: DataTableColumn<Book>[] = [
+    {
+      key: "title",
+      header: (
+        <button
+          type="button"
+          onClick={onSortChange}
+          className={cn(
+            "inline-flex items-center gap-1 font-medium transition-colors hover:text-foreground",
+          )}
+        >
+          Title
+          <SortIcon direction={sortDirection} />
+        </button>
+      ),
+      className: "max-w-[200px] truncate font-medium",
+      cell: (book) => (
+        <span
+          className={cn(
+            !book.is_active && "text-muted-foreground line-through",
+          )}
+        >
+          {book.title}
+        </span>
+      ),
+    },
+    {
+      key: "author",
+      header: "Author",
+      className: "max-w-[160px] truncate",
+      cell: (book) => (
+        <span className={cn(!book.is_active && "text-muted-foreground")}>
+          {book.author}
+        </span>
+      ),
+    },
+    {
+      key: "isbn",
+      header: "ISBN",
+      className: "text-muted-foreground",
+      cell: (book) => book.isbn ?? "—",
+    },
+    {
+      key: "genre",
+      header: "Genre",
+      className: "text-muted-foreground",
+      cell: (book) => book.genre ?? "—",
+    },
+    {
+      key: "shelf",
+      header: "Shelf Location",
+      headerClassName: "max-w-[120px]",
+      className: "max-w-[120px] truncate text-muted-foreground",
+      cell: (book) => (
+        <span title={book.shelf_location ?? undefined}>
+          {book.shelf_location ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (book) =>
+        !book.is_active ? (
+          <Badge
+            variant="destructive"
+            className="bg-destructive/15 hover:bg-destructive/15"
+          >
+            Inactive
+          </Badge>
+        ) : null,
+    },
+    {
+      key: "availability",
+      header: "Available/Total",
+      cell: (book) => (
+        <AvailabilityBadge
+          available={book.copies_available}
+          total={book.copies_total}
+        />
+      ),
+    },
+    {
+      key: "createdBy",
+      header: "Added By",
+      className: "text-muted-foreground",
+      cell: (book) => book.created_by ?? "—",
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      headerClassName: "w-[120px] text-right",
+      className: "text-right",
+      cell: (book) =>
+        book.is_active ? (
+          <div className="flex justify-end gap-1">
+            <Button
               type="button"
-              onClick={onSortChange}
-              className={cn(
-                "inline-flex items-center gap-1 font-medium transition-colors hover:text-foreground",
-              )}
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onEdit(book)}
+              aria-label={`Edit ${book.title}`}
             >
-              Title
-              <SortIcon direction={sortDirection} />
-            </button>
-          </TableHead>
-          <TableHead>Author</TableHead>
-          <TableHead>ISBN</TableHead>
-          <TableHead>Genre</TableHead>
-          <TableHead className="max-w-[120px]">Shelf Location</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Available/Total</TableHead>
-          <TableHead>Added By</TableHead>
-          <TableHead className="w-[120px] text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {books.map((book) => {
-          const isActive = book.is_active;
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => onDeactivate(book)}
+              aria-label={`Deactivate ${book.title}`}
+            >
+              <BookX className="size-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="text-emerald-600 hover:text-emerald-600"
+            onClick={() => onRestore(book)}
+            aria-label={`Restore ${book.title}`}
+          >
+            <RefreshCw className="size-4" />
+          </Button>
+        ),
+    },
+  ];
 
-          return (
-            <TableRow
-              key={book.id}
-              className={cn(
-                !isActive && "opacity-60",
-                highlightedBookId === book.id &&
-                  "bg-emerald-50/80 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:ring-emerald-800",
-              )}
-            >
-              <TableCell
-                className={cn(
-                  "max-w-[200px] truncate font-medium",
-                  !isActive && "text-muted-foreground line-through",
-                )}
-              >
-                {book.title}
-              </TableCell>
-              <TableCell
-                className={cn(
-                  "max-w-[160px] truncate",
-                  !isActive && "text-muted-foreground",
-                )}
-              >
-                {book.author}
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {book.isbn ?? "—"}
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {book.genre ?? "—"}
-              </TableCell>
-              <TableCell
-                className="max-w-[120px] truncate text-muted-foreground"
-                title={book.shelf_location ?? undefined}
-              >
-                {book.shelf_location ?? "—"}
-              </TableCell>
-              <TableCell>
-                {!isActive ? (
-                  <Badge
-                    variant="destructive"
-                    className="bg-destructive/15 hover:bg-destructive/15"
-                  >
-                    Inactive
-                  </Badge>
-                ) : null}
-              </TableCell>
-              <TableCell>
-                <AvailabilityBadge
-                  available={book.copies_available}
-                  total={book.copies_total}
-                />
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {book.created_by ?? "—"}
-              </TableCell>
-              <TableCell className="text-right">
-                {isActive ? (
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => onEdit(book)}
-                      aria-label={`Edit ${book.title}`}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => onDeactivate(book)}
-                      aria-label={`Deactivate ${book.title}`}
-                    >
-                      <BookX className="size-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-emerald-600 hover:text-emerald-600"
-                    onClick={() => onRestore(book)}
-                    aria-label={`Restore ${book.title}`}
-                  >
-                    <RefreshCw className="size-4" />
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+  return (
+    <DataTable
+      data={books}
+      columns={columns}
+      getRowKey={(book) => book.id}
+      getRowClassName={(book) =>
+        cn(
+          !book.is_active && "opacity-60",
+          highlightedBookId === book.id &&
+            "bg-emerald-50/80 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:ring-emerald-800",
+        )
+      }
+    />
   );
 }

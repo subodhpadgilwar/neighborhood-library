@@ -4,9 +4,14 @@ export type {
   StaffResponse,
 } from "./auth";
 
-export type { Book, BookCreate, BookUpdate } from "./book";
+export type { Book, BookCreate, BookListResponse, BookUpdate } from "./book";
 
-export type { Member, MemberCreate, MemberUpdate } from "./member";
+export type {
+  Member,
+  MemberCreate,
+  MemberListResponse,
+  MemberUpdate,
+} from "./member";
 
 export type {
   Lending,

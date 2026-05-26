@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { apiPaths } from "@/lib/apiPaths";
 import type { StaffResponse, TokenResponse } from "@/types";
 
 export async function login(
@@ -9,13 +10,13 @@ export async function login(
   body.append("username", email);
   body.append("password", password);
 
-  const { data } = await api.post<TokenResponse>("/auth/login", body, {
+  const { data } = await api.post<TokenResponse>(apiPaths.auth.login, body, {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
   return data;
 }
 
 export async function getMe(): Promise<StaffResponse> {
-  const { data } = await api.get<StaffResponse>("/auth/me");
+  const { data } = await api.get<StaffResponse>(apiPaths.auth.me);
   return data;
 }

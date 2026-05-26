@@ -1,31 +1,63 @@
 import axios from "axios";
 
 import { api } from "@/lib/api";
-import type { Book, BookCreate, BookUpdate } from "@/types";
+import { apiPaths } from "@/lib/apiPaths";
+import type { Book, BookCreate, BookListResponse, BookUpdate } from "@/types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export async function getAll(
-  skip = 0,
+interface BookPageParams {
+  page?: number;
+  limit?: number;
+  includeInactive?: boolean;
+  search?: string;
+  genre?: string;
+  sortBy?: "title" | "author" | "genre" | "created_at";
+  sortOrder?: "asc" | "desc";
+}
+
+export async function getPage({
+  page = 1,
   limit = 100,
   includeInactive = false,
-): Promise<Book[]> {
-  const { data } = await api.get<Book[]>("/books", {
-    params: { skip, limit, include_inactive: includeInactive },
+  search,
+  genre,
+  sortBy = "title",
+  sortOrder = "asc",
+}: BookPageParams = {}): Promise<BookListResponse> {
+  const { data } = await api.get<BookListResponse>(apiPaths.books.list, {
+    params: {
+      page,
+      limit,
+      include_inactive: includeInactive,
+      search: search?.trim() || undefined,
+      genre: genre?.trim() || undefined,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    },
   });
   return data;
 }
 
+export async function getAll(
+  page = 1,
+  limit = 100,
+  includeInactive = false,
+): Promise<Book[]> {
+  const data = await getPage({ page, limit, includeInactive });
+  return data.items;
+}
+
 export async function getById(id: string): Promise<Book> {
-  const { data } = await api.get<Book>(`/books/${id}`);
+  const { data } = await api.get<Book>(apiPaths.books.byId(id));
   return data;
 }
 
 export async function getByISBN(isbn: string): Promise<Book> {
   try {
     const { data } = await axios.get<Book>(
-      `${API_BASE_URL}/api/v1/books/isbn/${encodeURIComponent(isbn)}`,
+      `${API_BASE_URL}/api/v1${apiPaths.books.byISBN(isbn)}`,
     );
     return data;
   } catch (error) {
@@ -51,21 +83,21 @@ export async function getByISBN(isbn: string): Promise<Book> {
 }
 
 export async function create(book: BookCreate): Promise<Book> {
-  const { data } = await api.post<Book>("/books", book);
+  const { data } = await api.post<Book>(apiPaths.books.list, book);
   return data;
 }
 
 export async function update(id: string, book: BookUpdate): Promise<Book> {
-  const { data } = await api.put<Book>(`/books/${id}`, book);
+  const { data } = await api.put<Book>(apiPaths.books.byId(id), book);
   return data;
 }
 
 export async function deactivate(id: string): Promise<Book> {
-  const { data } = await api.delete<Book>(`/books/${id}`);
+  const { data } = await api.delete<Book>(apiPaths.books.byId(id));
   return data;
 }
 
 export async function restore(id: string): Promise<Book> {
-  const { data } = await api.put<Book>(`/books/${id}/restore`);
+  const { data } = await api.put<Book>(apiPaths.books.restore(id));
   return data;
 }

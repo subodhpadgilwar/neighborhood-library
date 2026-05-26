@@ -1,3 +1,5 @@
+import type { PaginatedResponse } from "@/types/common";
+
 export interface Member {
   id: string;
   name: string;
@@ -24,3 +26,5 @@ export interface MemberUpdate {
   phone?: string;
   address?: string;
 }
+
+export type MemberListResponse = PaginatedResponse<Member>;

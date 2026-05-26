@@ -2,7 +2,7 @@
 
 import { Search, UserPlus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -13,6 +13,7 @@ import { DeactivateConfirmDialog } from "@/components/shared/DeactivateConfirmDi
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorMessage } from "@/components/shared/ErrorMessage";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
+import { Pagination } from "@/components/shared/Pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,13 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { memberService } from "@/services";
 import type { Member } from "@/types";
 
-const PAGE_SIZE = 10;
-
-function sortByName(members: Member[]): Member[] {
-  return [...members].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-  );
-}
+const DEFAULT_PAGE_SIZE = 10;
 
 function MembersPageContent() {
   const router = useRouter();
@@ -37,6 +32,9 @@ function MembersPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [loansModalOpen, setLoansModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -49,8 +47,17 @@ function MembersPageContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await memberService.getAll(0, 1000, showInactive);
-      setMembers(data);
+      const data = await memberService.getPage({
+        page,
+        limit,
+        includeInactive: showInactive,
+        search,
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+      setMembers(data.items);
+      setTotalMembers(data.total);
+      setTotalPages(data.total_pages);
     } catch (err) {
       const apiError = err as { message?: string };
       setError(
@@ -61,7 +68,7 @@ function MembersPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [showInactive]);
+  }, [limit, page, search, showInactive]);
 
   useEffect(() => {
     void loadMembers();
@@ -75,40 +82,20 @@ function MembersPageContent() {
     }
   }, [searchParams, router]);
 
-  const filteredMembers = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return members;
-    }
-    return members.filter(
-      (member) =>
-        member.name.toLowerCase().includes(query) ||
-        member.email.toLowerCase().includes(query),
-    );
-  }, [members, search]);
-
-  const sortedMembers = useMemo(
-    () => sortByName(filteredMembers),
-    [filteredMembers],
-  );
-
-  const totalPages = Math.max(1, Math.ceil(sortedMembers.length / PAGE_SIZE));
-
-  const paginatedMembers = useMemo(() => {
-    const safePage = Math.min(page, totalPages);
-    const start = (safePage - 1) * PAGE_SIZE;
-    return sortedMembers.slice(start, start + PAGE_SIZE);
-  }, [sortedMembers, page, totalPages]);
-
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, showInactive]);
 
   useEffect(() => {
-    if (page > totalPages) {
+    if (totalPages > 0 && page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages]);
+
+  function handleLimitChange(nextLimit: number) {
+    setLimit(nextLimit);
+    setPage(1);
+  }
 
   function openCreateModal() {
     setEditingMember(null);
@@ -165,7 +152,7 @@ function MembersPageContent() {
     void loadMembers();
   }
 
-  const isEmpty = !isLoading && !error && sortedMembers.length === 0;
+  const isEmpty = !isLoading && !error && members.length === 0;
 
   return (
     <AppLayout title="Members">
@@ -217,45 +204,21 @@ function MembersPageContent() {
         ) : (
           <>
             <MemberTable
-              members={paginatedMembers}
+              members={members}
               onEdit={openEditModal}
               onViewLoans={openLoansModal}
               onDeactivate={handleDeactivate}
               onRestore={handleRestore}
             />
 
-            {totalPages > 1 ? (
-              <div className="flex items-center justify-between gap-4">
-                <p className="text-sm text-muted-foreground">
-                  Showing {(page - 1) * PAGE_SIZE + 1}–
-                  {Math.min(page * PAGE_SIZE, sortedMembers.length)} of{" "}
-                  {sortedMembers.length}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => p - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm tabular-nums">
-                    Page {page} of {totalPages}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={totalMembers}
+              itemsPerPage={limit}
+              onPageChange={setPage}
+              onLimitChange={handleLimitChange}
+            />
           </>
         )}
       </div>

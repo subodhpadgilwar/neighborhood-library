@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { apiPaths } from "@/lib/apiPaths";
 import type {
   BorrowRequest,
   Lending,
@@ -47,22 +48,24 @@ function buildHistoryQueryParams(
 }
 
 export async function getAllActive(): Promise<Lending[]> {
-  const { data } = await api.get<Lending[]>("/lending");
+  const { data } = await api.get<Lending[]>(apiPaths.lending.list);
   return data;
 }
 
 export async function getOverdue(): Promise<Lending[]> {
-  const { data } = await api.get<Lending[]>("/lending/overdue");
+  const { data } = await api.get<Lending[]>(apiPaths.lending.overdue);
   return data;
 }
 
 export async function borrowBook(request: BorrowRequest): Promise<Lending> {
-  const { data } = await api.post<Lending>("/lending/borrow", request);
+  const { data } = await api.post<Lending>(apiPaths.lending.borrow, request);
   return data;
 }
 
 export async function returnBook(lendingId: string): Promise<Lending> {
-  const { data } = await api.put<Lending>(`/lending/${lendingId}/return`);
+  const { data } = await api.put<Lending>(
+    apiPaths.lending.returnBook(lendingId),
+  );
   return data;
 }
 
@@ -70,16 +73,19 @@ export async function updateDueDate(
   lendingId: string,
   dueDate: string,
 ): Promise<Lending> {
-  const { data } = await api.put<Lending>(`/lending/${lendingId}/due-date`, {
-    due_date: dueDate,
-  });
+  const { data } = await api.put<Lending>(
+    apiPaths.lending.dueDate(lendingId),
+    {
+      due_date: dueDate,
+    },
+  );
   return data;
 }
 
 export async function getHistory(
   filters?: LendingFilters,
 ): Promise<LendingHistoryResponse> {
-  const { data } = await api.get<LendingHistoryResponse>("/lending/history", {
+  const { data } = await api.get<LendingHistoryResponse>(apiPaths.lending.history, {
     params: buildHistoryQueryParams(filters),
   });
   return data;

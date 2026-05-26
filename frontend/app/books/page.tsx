@@ -2,7 +2,7 @@
 
 import { Camera, Plus, Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { BookFormModal } from "@/components/books/BookFormModal";
@@ -13,27 +13,19 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { BarcodeScanner } from "@/components/shared/BarcodeScanner";
 import { DeactivateConfirmDialog } from "@/components/shared/DeactivateConfirmDialog";
-import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorMessage } from "@/components/shared/ErrorMessage";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
+import { Pagination } from "@/components/shared/Pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { bookService } from "@/services";
 import type { Book } from "@/types";
 
-const PAGE_SIZE = 10;
-
-function sortByTitle(books: Book[], direction: TitleSortDirection): Book[] {
-  return [...books].sort((a, b) => {
-    const cmp = a.title.localeCompare(b.title, undefined, {
-      sensitivity: "base",
-    });
-    return direction === "asc" ? cmp : -cmp;
-  });
-}
+const DEFAULT_PAGE_SIZE = 10;
 
 function BooksPageContent() {
   const router = useRouter();
@@ -46,6 +38,9 @@ function BooksPageContent() {
   const [sortDirection, setSortDirection] =
     useState<TitleSortDirection>("asc");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+  const [totalBooks, setTotalBooks] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [showInactive, setShowInactive] = useState(false);
@@ -61,8 +56,17 @@ function BooksPageContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await bookService.getAll(0, 1000, showInactive);
-      setBooks(data);
+      const data = await bookService.getPage({
+        page,
+        limit,
+        includeInactive: showInactive,
+        search,
+        sortBy: "title",
+        sortOrder: sortDirection,
+      });
+      setBooks(data.items);
+      setTotalBooks(data.total);
+      setTotalPages(data.total_pages);
     } catch (err) {
       const apiError = err as { message?: string };
       setError(
@@ -73,7 +77,7 @@ function BooksPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [showInactive]);
+  }, [limit, page, search, showInactive, sortDirection]);
 
   useEffect(() => {
     void loadBooks();
@@ -87,38 +91,12 @@ function BooksPageContent() {
     }
   }, [searchParams, router]);
 
-  const filteredBooks = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return books;
-    }
-    return books.filter(
-      (book) =>
-        book.title.toLowerCase().includes(query) ||
-        book.author.toLowerCase().includes(query) ||
-        (book.shelf_location?.toLowerCase().includes(query) ?? false),
-    );
-  }, [books, search]);
-
-  const sortedBooks = useMemo(
-    () => sortByTitle(filteredBooks, sortDirection),
-    [filteredBooks, sortDirection],
-  );
-
-  const totalPages = Math.max(1, Math.ceil(sortedBooks.length / PAGE_SIZE));
-
-  const paginatedBooks = useMemo(() => {
-    const safePage = Math.min(page, totalPages);
-    const start = (safePage - 1) * PAGE_SIZE;
-    return sortedBooks.slice(start, start + PAGE_SIZE);
-  }, [sortedBooks, page, totalPages]);
-
   useEffect(() => {
     setPage(1);
-  }, [search, sortDirection]);
+  }, [search, showInactive, sortDirection]);
 
   useEffect(() => {
-    if (page > totalPages) {
+    if (totalPages > 0 && page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages]);
@@ -168,6 +146,11 @@ function BooksPageContent() {
     setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
   }
 
+  function handleLimitChange(nextLimit: number) {
+    setLimit(nextLimit);
+    setPage(1);
+  }
+
   function handleDeactivate(book: Book) {
     setSelectedBook(book);
     setIsDeactivateModalOpen(true);
@@ -194,7 +177,7 @@ function BooksPageContent() {
     void loadBooks();
   }
 
-  const isEmpty = !isLoading && !error && sortedBooks.length === 0;
+  const isEmpty = !isLoading && !error && books.length === 0;
 
   return (
     <AppLayout title="Books">
@@ -262,7 +245,7 @@ function BooksPageContent() {
         ) : (
           <>
             <BookTable
-              books={paginatedBooks}
+              books={books}
               sortDirection={sortDirection}
               highlightedBookId={highlightedBookId}
               onSortChange={toggleSort}
@@ -271,38 +254,14 @@ function BooksPageContent() {
               onRestore={handleRestore}
             />
 
-            {totalPages > 1 ? (
-              <div className="flex items-center justify-between gap-4">
-                <p className="text-sm text-muted-foreground">
-                  Showing {(page - 1) * PAGE_SIZE + 1}–
-                  {Math.min(page * PAGE_SIZE, sortedBooks.length)} of{" "}
-                  {sortedBooks.length}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => p - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm tabular-nums">
-                    Page {page} of {totalPages}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={totalBooks}
+              itemsPerPage={limit}
+              onPageChange={setPage}
+              onLimitChange={handleLimitChange}
+            />
           </>
         )}
       </div>

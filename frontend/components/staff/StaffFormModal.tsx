@@ -1,18 +1,11 @@
 "use client";
 
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { FormDialog } from "@/components/shared/FormDialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isValidEmail, isValidPassword, PASSWORD_HINT } from "@/lib/password";
@@ -191,27 +184,24 @@ export function StaffFormModal({
   }
 
   return (
-    <Dialog
+    <FormDialog
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
           onClose();
         }
       }}
+      title={isCreate ? "Add Staff Member" : "Edit Staff Member"}
+      description={
+        isCreate
+          ? "Create a new staff account with login credentials."
+          : "Update staff profile details."
+      }
+      submitLabel={isCreate ? "Add Staff" : "Save Changes"}
+      isSubmitting={isSubmitting}
+      apiError={apiError}
+      onSubmit={handleSubmit}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isCreate ? "Add Staff Member" : "Edit Staff Member"}
-          </DialogTitle>
-          <DialogDescription>
-            {isCreate
-              ? "Create a new staff account with login credentials."
-              : "Update staff profile details."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="staff-full-name">
               Full Name <span className="text-destructive">*</span>
@@ -277,36 +267,6 @@ export function StaffFormModal({
             </>
           ) : null}
 
-          {apiError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {apiError}
-            </p>
-          ) : null}
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Loading...
-                </>
-              ) : isCreate ? (
-                "Add Staff"
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }

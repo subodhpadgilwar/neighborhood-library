@@ -1,18 +1,9 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/shared/FormDialog";
 import { LocationScanner } from "@/components/shared/LocationScanner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,18 +143,20 @@ export function BookFormModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Book" : "Add Book"}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Update book details below."
-              : "Enter details for a new book in the catalog."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEdit ? "Edit Book" : "Add Book"}
+      description={
+        isEdit
+          ? "Update book details below."
+          : "Enter details for a new book in the catalog."
+      }
+      submitLabel={isEdit ? "Save Changes" : "Add Book"}
+      isSubmitting={isSubmitting}
+      apiError={apiError}
+      onSubmit={handleSubmit}
+    >
           <div className="space-y-2">
             <Label htmlFor="book-title">
               Title <span className="text-destructive">*</span>
@@ -246,36 +239,6 @@ export function BookFormModal({
             ) : null}
           </div>
 
-          {apiError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {apiError}
-            </p>
-          ) : null}
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Loading...
-                </>
-              ) : isEdit ? (
-                "Save Changes"
-              ) : (
-                "Add Book"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }
