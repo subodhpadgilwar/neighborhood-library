@@ -131,3 +131,13 @@ class MemberResponse(MemberBase):
         """Convert UTC timestamps to the application local timezone."""
         self.created_at = to_local(self.created_at)  # type: ignore[misc]
         self.updated_at = to_local(self.updated_at)  # type: ignore[misc]
+
+
+class MemberListResponse(BaseModel):
+    """Paginated response for member list views."""
+
+    items: list[MemberResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int

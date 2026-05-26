@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy import DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -72,6 +72,21 @@ class LendingRecord(Base, AuditMixin):
     returned_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+    __table_args__ = (
+        Index("ix_lending_records_book_id", "book_id"),
+        Index("ix_lending_records_member_id", "member_id"),
+        Index("ix_lending_records_borrowed_at", "borrowed_at"),
+        Index("ix_lending_records_due_date", "due_date"),
+        Index("ix_lending_records_returned_at", "returned_at"),
+        Index(
+            "uq_lending_active_book_member",
+            "book_id",
+            "member_id",
+            unique=True,
+            postgresql_where=returned_at.is_(None),
+        ),
     )
 
     book: Mapped["Book"] = relationship(back_populates="lending_records")

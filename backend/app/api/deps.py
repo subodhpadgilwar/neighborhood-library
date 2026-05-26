@@ -1,47 +1,23 @@
-"""FastAPI dependencies for database sessions and authentication.
+"""FastAPI dependencies for authentication and shared request resources.
 
-Used with ``Depends()`` in route handlers throughout the API to inject
-database sessions and resolve the current authenticated staff member.
+Used with ``Depends()`` in route handlers throughout the API to resolve the
+current authenticated staff member. The database dependency is re-exported
+from ``app.database`` so there is a single request-session implementation.
 """
 
-from collections.abc import AsyncGenerator
 from uuid import UUID
 
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidTokenException
-from app.core.logger import library_api
 from app.core.security import decode_access_token
-from app.database import AsyncSessionLocal
+from app.database import get_db
 from app.models.staff import Staff
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an async database session for the duration of a request.
-
-    Args:
-        None (injected by FastAPI).
-
-    Yields:
-        AsyncSession bound to the request lifecycle; closed in ``finally``.
-
-    Raises:
-        SQLAlchemyError: Logged and re-raised on connection failures.
-    """
-    session = AsyncSessionLocal()
-    try:
-        yield session
-    except SQLAlchemyError as exc:
-        library_api.error("Database connection error: %s", exc, exc_info=True)
-        raise
-    finally:
-        await session.close()
 
 
 async def get_current_staff(

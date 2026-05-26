@@ -52,6 +52,23 @@ class LendingRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_id_for_update(
+        db: AsyncSession,
+        lending_id: UUID,
+    ) -> LendingRecord | None:
+        """Fetch a lending row with a write lock for return/update workflows."""
+        library_api.debug(
+            "LendingRepository.get_by_id_for_update lending_id=%s",
+            lending_id,
+        )
+        result = await db.execute(
+            LendingRepository._select_lending()
+            .where(LendingRecord.id == lending_id)
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_active_by_book(
         db: AsyncSession,
         book_id: UUID,
@@ -395,9 +412,8 @@ class LendingRepository:
             created_by=staff_id,
         )
         db.add(lending)
-        await db.commit()
-        loaded = await LendingRepository.get_by_id(db, lending.id)
-        return loaded if loaded is not None else lending
+        await db.flush()
+        return lending
 
     @staticmethod
     async def update_due_date(
@@ -425,9 +441,8 @@ class LendingRepository:
         lending.due_date = new_due_date
         lending.updated_by = staff_id
         lending.updated_at = now_utc()
-        await db.commit()
-        loaded = await LendingRepository.get_by_id(db, lending.id)
-        return loaded if loaded is not None else lending
+        await db.flush()
+        return lending
 
     @staticmethod
     async def mark_returned(
@@ -452,6 +467,6 @@ class LendingRepository:
         )
         lending.returned_at = now_utc()
         lending.updated_by = staff_id
-        await db.commit()
-        loaded = await LendingRepository.get_by_id(db, lending.id)
-        return loaded if loaded is not None else lending
+        lending.updated_at = now_utc()
+        await db.flush()
+        return lending

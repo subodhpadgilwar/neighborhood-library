@@ -131,8 +131,7 @@ class StaffRepository:
             hashed_password=hash_password(data.password),
         )
         db.add(staff)
-        await db.commit()
-        await db.refresh(staff)
+        await db.flush()
         return staff
 
     @staticmethod
@@ -154,8 +153,7 @@ class StaffRepository:
         for field, value in updates.items():
             setattr(staff, field, value)
         staff.updated_at = now_utc()
-        await db.commit()
-        await db.refresh(staff)
+        await db.flush()
         return staff
 
     @staticmethod
@@ -173,8 +171,7 @@ class StaffRepository:
         library_api.debug("StaffRepository.update_password staff_id=%s", staff.id)
         staff.hashed_password = hash_password(new_password)
         staff.updated_at = now_utc()
-        await db.commit()
-        await db.refresh(staff)
+        await db.flush()
         return staff
 
     @staticmethod
@@ -191,8 +188,7 @@ class StaffRepository:
         library_api.debug("StaffRepository.soft_delete staff_id=%s", staff.id)
         staff.is_active = False
         staff.updated_at = now_utc()
-        await db.commit()
-        await db.refresh(staff)
+        await db.flush()
         return staff
 
     @staticmethod
@@ -209,6 +205,5 @@ class StaffRepository:
         library_api.debug("StaffRepository.restore staff_id=%s", staff.id)
         staff.is_active = True
         staff.updated_at = now_utc()
-        await db.commit()
-        await db.refresh(staff)
+        await db.flush()
         return staff

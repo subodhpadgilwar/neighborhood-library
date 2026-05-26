@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
@@ -49,11 +49,54 @@ class BookRepository:
         return stmt
 
     @staticmethod
+    def _apply_search_filter(
+        stmt: Select[tuple[Book]],
+        search: str | None,
+        genre: str | None,
+    ) -> Select[tuple[Book]]:
+        """Apply optional catalog search filters to a book query."""
+        if search:
+            pattern = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    Book.title.ilike(pattern),
+                    Book.author.ilike(pattern),
+                    Book.isbn.ilike(pattern),
+                    Book.shelf_location.ilike(pattern),
+                )
+            )
+        if genre:
+            stmt = stmt.where(Book.genre.ilike(genre.strip()))
+        return stmt
+
+    @staticmethod
+    def _apply_sort(
+        stmt: Select[tuple[Book]],
+        sort_by: str,
+        sort_order: str,
+    ) -> Select[tuple[Book]]:
+        """Apply a safe sort expression for catalog lists."""
+        columns = {
+            "title": Book.title,
+            "author": Book.author,
+            "genre": Book.genre,
+            "created_at": Book.created_at,
+        }
+        sort_column = columns.get(sort_by, Book.title)
+        if sort_order == "desc":
+            return stmt.order_by(sort_column.desc())
+        return stmt.order_by(sort_column.asc())
+
+    @staticmethod
     async def get_all(
         db: AsyncSession,
         skip: int = 0,
         limit: int = 100,
         include_inactive: bool = False,
+        search: str | None = None,
+        genre: str | None = None,
+        sort_by: str = "title",
+        sort_order: str = "asc",
     ) -> list[Book]:
         """Fetch a paginated list of books.
 
@@ -76,8 +119,23 @@ class BookRepository:
             BookRepository._select_books(),
             include_inactive,
         )
+        stmt = BookRepository._apply_search_filter(stmt, search, genre)
+        stmt = BookRepository._apply_sort(stmt, sort_by, sort_order)
         result = await db.execute(stmt.offset(skip).limit(limit))
         return list(result.scalars().all())
+
+    @staticmethod
+    async def count(
+        db: AsyncSession,
+        include_inactive: bool = False,
+        search: str | None = None,
+        genre: str | None = None,
+    ) -> int:
+        """Count books matching the same filters used by ``get_all``."""
+        stmt = BookRepository._apply_active_filter(select(Book), include_inactive)
+        stmt = BookRepository._apply_search_filter(stmt, search, genre).subquery()
+        result = await db.execute(select(func.count()).select_from(stmt))
+        return int(result.scalar_one())
 
     @staticmethod
     async def get_by_id(
@@ -104,6 +162,25 @@ class BookRepository:
             BookRepository._select_books().where(Book.id == book_id),
             include_inactive,
         )
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_id_for_update(
+        db: AsyncSession,
+        book_id: UUID,
+        include_inactive: bool = False,
+    ) -> Book | None:
+        """Fetch a book row with a write lock for inventory-sensitive updates."""
+        library_api.debug(
+            "BookRepository.get_by_id_for_update book_id=%s include_inactive=%s",
+            book_id,
+            include_inactive,
+        )
+        stmt = BookRepository._apply_active_filter(
+            BookRepository._select_books().where(Book.id == book_id),
+            include_inactive,
+        ).with_for_update()
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -141,9 +218,8 @@ class BookRepository:
             copies_available=data.copies_total,
         )
         db.add(book)
-        await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
-        return loaded if loaded is not None else book
+        await db.flush()
+        return book
 
     @staticmethod
     async def update(db: AsyncSession, book: Book, data: BookUpdate) -> Book:
@@ -160,9 +236,8 @@ class BookRepository:
         library_api.debug("BookRepository.update book_id=%s", book.id)
         for field, value in data.model_dump(exclude_none=True).items():
             setattr(book, field, value)
-        await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
-        return loaded if loaded is not None else book
+        await db.flush()
+        return book
 
     @staticmethod
     async def delete(db: AsyncSession, book: Book) -> None:
@@ -174,7 +249,7 @@ class BookRepository:
         """
         library_api.debug("BookRepository.delete book_id=%s", book.id)
         await db.delete(book)
-        await db.commit()
+        await db.flush()
 
     @staticmethod
     async def soft_delete(db: AsyncSession, book: Book, staff_id: UUID) -> Book:
@@ -192,9 +267,8 @@ class BookRepository:
         book.is_active = False
         book.updated_by = staff_id
         book.updated_at = now_utc()
-        await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
-        return loaded if loaded is not None else book
+        await db.flush()
+        return book
 
     @staticmethod
     async def restore(db: AsyncSession, book: Book, staff_id: UUID) -> Book:
@@ -212,9 +286,8 @@ class BookRepository:
         book.is_active = True
         book.updated_by = staff_id
         book.updated_at = now_utc()
-        await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
-        return loaded if loaded is not None else book
+        await db.flush()
+        return book
 
     @staticmethod
     async def decrement_copies(db: AsyncSession, book: Book) -> Book:
@@ -229,9 +302,8 @@ class BookRepository:
         """
         library_api.debug("BookRepository.decrement_copies book_id=%s", book.id)
         book.copies_available -= 1
-        await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
-        return loaded if loaded is not None else book
+        await db.flush()
+        return book
 
     @staticmethod
     async def increment_copies(db: AsyncSession, book: Book) -> Book:
@@ -246,6 +318,5 @@ class BookRepository:
         """
         library_api.debug("BookRepository.increment_copies book_id=%s", book.id)
         book.copies_available += 1
-        await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
-        return loaded if loaded is not None else book
+        await db.flush()
+        return book

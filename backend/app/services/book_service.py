@@ -4,9 +4,11 @@ Orchestrates between repository layer and API layer. All business rules and
 validation that requires database context live here.
 """
 
+import math
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BookNotFoundException, DuplicateISBNException
@@ -14,7 +16,7 @@ from app.core.logger import library_api
 from app.models.book import Book
 from app.repositories.book_repo import BookRepository
 from app.repositories.lending_repo import LendingRepository
-from app.schemas.book import BookCreate, BookUpdate
+from app.schemas.book import BookCreate, BookListResponse, BookResponse, BookUpdate
 
 
 class BookService:
@@ -26,6 +28,10 @@ class BookService:
         skip: int = 0,
         limit: int = 100,
         include_inactive: bool = False,
+        search: str | None = None,
+        genre: str | None = None,
+        sort_by: str = "title",
+        sort_order: str = "asc",
     ) -> list[Book]:
         """Return a paginated list of books.
 
@@ -43,6 +49,47 @@ class BookService:
             skip=skip,
             limit=limit,
             include_inactive=include_inactive,
+            search=search,
+            genre=genre,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+
+    @staticmethod
+    async def get_page(
+        db: AsyncSession,
+        page: int = 1,
+        limit: int = 100,
+        include_inactive: bool = False,
+        search: str | None = None,
+        genre: str | None = None,
+        sort_by: str = "title",
+        sort_order: str = "asc",
+    ) -> BookListResponse:
+        """Return a paginated, filterable catalog response."""
+        skip = (page - 1) * limit
+        books = await BookRepository.get_all(
+            db,
+            skip=skip,
+            limit=limit,
+            include_inactive=include_inactive,
+            search=search,
+            genre=genre,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+        total = await BookRepository.count(
+            db,
+            include_inactive=include_inactive,
+            search=search,
+            genre=genre,
+        )
+        return BookListResponse(
+            items=[BookResponse.model_validate(book) for book in books],
+            total=total,
+            page=page,
+            limit=limit,
+            total_pages=math.ceil(total / limit) if limit > 0 else 0,
         )
 
     @staticmethod
@@ -116,15 +163,26 @@ class BookService:
         Raises:
             DuplicateISBNException: If the ISBN is already in use.
         """
-        if data.isbn is not None:
-            existing = await BookRepository.get_by_isbn(db, data.isbn)
-            if existing is not None:
-                raise DuplicateISBNException(data.isbn)
+        try:
+            if data.isbn is not None:
+                existing = await BookRepository.get_by_isbn(db, data.isbn)
+                if existing is not None:
+                    raise DuplicateISBNException(data.isbn)
 
-        book = await BookRepository.create(db, data)
-        book.created_by = staff_id
-        await db.commit()
-        loaded = await BookRepository.get_by_id(db, book.id, include_inactive=True)
+            book = await BookRepository.create(db, data)
+            book.created_by = staff_id
+            book_id = book.id
+            await db.commit()
+        except IntegrityError as exc:
+            await db.rollback()
+            if data.isbn is not None:
+                raise DuplicateISBNException(data.isbn) from exc
+            raise
+        except Exception:
+            await db.rollback()
+            raise
+
+        loaded = await BookRepository.get_by_id(db, book_id, include_inactive=True)
         book = loaded if loaded is not None else book
         library_api.info("Book created: %s", book.title)
         return book
@@ -151,17 +209,43 @@ class BookService:
             BookNotFoundException: If the book does not exist.
             DuplicateISBNException: If the new ISBN belongs to another book.
         """
-        book = await BookRepository.get_by_id(db, book_id)
-        if book is None:
-            raise BookNotFoundException(book_id)
+        try:
+            book = await BookRepository.get_by_id_for_update(db, book_id)
+            if book is None:
+                raise BookNotFoundException(book_id)
 
-        if data.isbn is not None:
-            existing = await BookRepository.get_by_isbn(db, data.isbn)
-            if existing is not None and existing.id != book.id:
-                raise DuplicateISBNException(data.isbn)
+            if data.isbn is not None:
+                existing = await BookRepository.get_by_isbn(db, data.isbn)
+                if existing is not None and existing.id != book.id:
+                    raise DuplicateISBNException(data.isbn)
 
-        book.updated_by = staff_id
-        book = await BookRepository.update(db, book, data)
+            if data.copies_total is not None:
+                borrowed_count = book.copies_total - book.copies_available
+                if data.copies_total < borrowed_count:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            "Total copies cannot be less than currently "
+                            "borrowed copies"
+                        ),
+                    )
+                book.copies_available = data.copies_total - borrowed_count
+
+            book.updated_by = staff_id
+            book = await BookRepository.update(db, book, data)
+            updated_id = book.id
+            await db.commit()
+        except IntegrityError as exc:
+            await db.rollback()
+            if data.isbn is not None:
+                raise DuplicateISBNException(data.isbn) from exc
+            raise
+        except Exception:
+            await db.rollback()
+            raise
+
+        loaded = await BookRepository.get_by_id(db, updated_id, include_inactive=True)
+        book = loaded if loaded is not None else book
         library_api.info("Book updated: %s", book.id)
         return book
 
@@ -181,18 +265,30 @@ class BookService:
             BookNotFoundException: If the book does not exist or is already inactive.
             HTTPException: If the book still has active loan(s).
         """
-        book = await BookRepository.get_by_id(db, book_id, include_inactive=False)
-        if book is None:
-            raise BookNotFoundException(book_id)
-
-        active_loans = await LendingRepository.get_active_by_book(db, book_id)
-        if active_loans:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot delete book with {len(active_loans)} active loan(s)",
+        try:
+            book = await BookRepository.get_by_id_for_update(
+                db,
+                book_id,
+                include_inactive=False,
             )
+            if book is None:
+                raise BookNotFoundException(book_id)
 
-        book = await BookRepository.soft_delete(db, book, staff_id)
+            active_loans = await LendingRepository.get_active_by_book(db, book_id)
+            if active_loans:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot delete book with {len(active_loans)} active loan(s)",
+                )
+
+            book = await BookRepository.soft_delete(db, book, staff_id)
+            updated_id = book.id
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+        loaded = await BookRepository.get_by_id(db, updated_id, include_inactive=True)
+        book = loaded if loaded is not None else book
         library_api.info("Book soft deleted: %s by staff %s", book_id, staff_id)
         return book
 
@@ -211,10 +307,22 @@ class BookService:
         Raises:
             BookNotFoundException: If no book exists for the given id.
         """
-        book = await BookRepository.get_by_id(db, book_id, include_inactive=True)
-        if book is None:
-            raise BookNotFoundException(book_id)
+        try:
+            book = await BookRepository.get_by_id_for_update(
+                db,
+                book_id,
+                include_inactive=True,
+            )
+            if book is None:
+                raise BookNotFoundException(book_id)
 
-        book = await BookRepository.restore(db, book, staff_id)
+            book = await BookRepository.restore(db, book, staff_id)
+            updated_id = book.id
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+        loaded = await BookRepository.get_by_id(db, updated_id, include_inactive=True)
+        book = loaded if loaded is not None else book
         library_api.info("Book restored: %s by staff %s", book_id, staff_id)
         return book

@@ -11,29 +11,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_staff, get_db
 from app.models.staff import Staff
 from app.schemas.lending import LendingResponse
-from app.schemas.member import MemberCreate, MemberResponse, MemberUpdate
+from app.schemas.member import MemberCreate, MemberListResponse, MemberResponse, MemberUpdate
 from app.services.lending_service import LendingService
 from app.services.member_service import MemberService
 
 router = APIRouter(prefix="/members", tags=["Members"])
 
 
-@router.get("/", response_model=list[MemberResponse])
+@router.get("/", response_model=MemberListResponse)
 async def list_members(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
-    skip: int = Query(0, ge=0),
+    page: int = Query(1, ge=1),
     limit: int = Query(100, ge=1, le=1000),
+    search: str | None = Query(None, min_length=1, max_length=255),
+    sort_by: str = Query("name", pattern="^(name|email|created_at)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     include_inactive: bool = False,
-) -> list[MemberResponse]:
-    """List library members with pagination and optional inactive filter."""
-    members = await MemberService.get_all(
+) -> MemberListResponse:
+    """List library members with server-side pagination and filtering."""
+    return await MemberService.get_page(
         db,
-        skip=skip,
+        page=page,
         limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
         include_inactive=include_inactive,
     )
-    return [MemberResponse.model_validate(member) for member in members]
 
 
 @router.post("/", response_model=MemberResponse, status_code=201)

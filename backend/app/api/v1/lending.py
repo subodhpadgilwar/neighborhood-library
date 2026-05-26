@@ -18,6 +18,9 @@ from app.schemas.lending import (
     LendingFilterParams,
     LendingHistoryResponse,
     LendingResponse,
+    LendingSortBy,
+    LendingSortOrder,
+    LendingStatusFilter,
     UpdateDueDateRequest,
 )
 from app.services.lending_service import LendingService
@@ -50,25 +53,25 @@ async def borrow_book(
 async def lending_history(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
-    status: Optional[str] = Query(None),
+    status: Optional[LendingStatusFilter] = Query(None),
     member_name: Optional[str] = Query(None),
     book_title: Optional[str] = Query(None),
     borrowed_from: Optional[datetime] = Query(None),
     borrowed_to: Optional[datetime] = Query(None),
-    sort_by: Optional[str] = Query("borrowed_at"),
-    sort_order: Optional[str] = Query("desc"),
+    sort_by: Optional[LendingSortBy] = Query("borrowed_at"),
+    sort_order: Optional[LendingSortOrder] = Query("desc"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ) -> LendingHistoryResponse:
     """Return paginated lending history with status, name, date, and sort filters."""
     filters = LendingFilterParams(
-        status=status,  # type: ignore[arg-type]
+        status=status,
         member_name=member_name,
         book_title=book_title,
         borrowed_from=borrowed_from,
         borrowed_to=borrowed_to,
-        sort_by=sort_by,  # type: ignore[arg-type]
-        sort_order=sort_order,  # type: ignore[arg-type]
+        sort_by=sort_by,
+        sort_order=sort_order,
         skip=skip,
         limit=limit,
     )

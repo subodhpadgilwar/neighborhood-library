@@ -52,7 +52,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     try:
         yield session
     except SQLAlchemyError as exc:
+        await session.rollback()
         library_api.error("Database connection error: %s", exc, exc_info=True)
+        raise
+    except Exception:
+        await session.rollback()
         raise
     finally:
         await session.close()

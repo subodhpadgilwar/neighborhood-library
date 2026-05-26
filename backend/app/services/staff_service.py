@@ -89,11 +89,17 @@ class StaffService:
             DuplicateEmailException: If the email is already registered.
         """
         email = str(data.email)
-        existing = await StaffRepository.get_by_email(db, email)
-        if existing is not None:
-            raise DuplicateEmailException(email)
+        try:
+            existing = await StaffRepository.get_by_email(db, email)
+            if existing is not None:
+                raise DuplicateEmailException(email)
 
-        staff = await StaffRepository.create(db, data)
+            staff = await StaffRepository.create(db, data)
+            await db.commit()
+            await db.refresh(staff)
+        except Exception:
+            await db.rollback()
+            raise
         library_api.info(
             "Staff created: %s by %s",
             staff.email,
@@ -123,18 +129,24 @@ class StaffService:
             StaffNotFoundException: If the staff account does not exist.
             DuplicateEmailException: If the new email belongs to another account.
         """
-        staff = await StaffRepository.get_by_id(db, staff_id)
-        if staff is None:
-            raise StaffNotFoundException()
+        try:
+            staff = await StaffRepository.get_by_id(db, staff_id)
+            if staff is None:
+                raise StaffNotFoundException()
 
-        if data.email is not None:
-            new_email = str(data.email)
-            if new_email != staff.email:
-                existing = await StaffRepository.get_by_email(db, new_email)
-                if existing is not None:
-                    raise DuplicateEmailException(new_email)
+            if data.email is not None:
+                new_email = str(data.email)
+                if new_email != staff.email:
+                    existing = await StaffRepository.get_by_email(db, new_email)
+                    if existing is not None:
+                        raise DuplicateEmailException(new_email)
 
-        staff = await StaffRepository.update(db, staff, data)
+            staff = await StaffRepository.update(db, staff, data)
+            await db.commit()
+            await db.refresh(staff)
+        except Exception:
+            await db.rollback()
+            raise
         library_api.info(
             "Staff updated: %s by %s",
             staff.email,
@@ -173,7 +185,13 @@ class StaffService:
                 detail="New password must differ from current",
             )
 
-        staff = await StaffRepository.update_password(db, staff, data.new_password)
+        try:
+            staff = await StaffRepository.update_password(db, staff, data.new_password)
+            await db.commit()
+            await db.refresh(staff)
+        except Exception:
+            await db.rollback()
+            raise
         library_api.info("Password changed for: %s", staff.email)
         return staff
 
@@ -198,11 +216,17 @@ class StaffService:
         Raises:
             StaffNotFoundException: If the target staff account does not exist.
         """
-        staff = await StaffRepository.get_by_id(db, staff_id)
-        if staff is None:
-            raise StaffNotFoundException()
+        try:
+            staff = await StaffRepository.get_by_id(db, staff_id)
+            if staff is None:
+                raise StaffNotFoundException()
 
-        staff = await StaffRepository.update_password(db, staff, data.new_password)
+            staff = await StaffRepository.update_password(db, staff, data.new_password)
+            await db.commit()
+            await db.refresh(staff)
+        except Exception:
+            await db.rollback()
+            raise
         library_api.info(
             "Admin %s changed password for %s",
             current_staff.email,
@@ -230,23 +254,29 @@ class StaffService:
             StaffNotFoundException: If the staff account does not exist.
             HTTPException: If targeting the default admin or the caller's own account.
         """
-        staff = await StaffRepository.get_by_id(db, staff_id)
-        if staff is None:
-            raise StaffNotFoundException()
+        try:
+            staff = await StaffRepository.get_by_id(db, staff_id)
+            if staff is None:
+                raise StaffNotFoundException()
 
-        if staff.is_default_admin:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot deactivate the default admin",
-            )
+            if staff.is_default_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot deactivate the default admin",
+                )
 
-        if staff.id == current_staff.id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot deactivate your own account",
-            )
+            if staff.id == current_staff.id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot deactivate your own account",
+                )
 
-        staff = await StaffRepository.soft_delete(db, staff)
+            staff = await StaffRepository.soft_delete(db, staff)
+            await db.commit()
+            await db.refresh(staff)
+        except Exception:
+            await db.rollback()
+            raise
         library_api.info(
             "Staff soft deleted: %s by %s",
             staff.email,
@@ -273,11 +303,17 @@ class StaffService:
         Raises:
             StaffNotFoundException: If no staff account exists for the given id.
         """
-        staff = await StaffRepository.get_by_id(db, staff_id, include_inactive=True)
-        if staff is None:
-            raise StaffNotFoundException()
+        try:
+            staff = await StaffRepository.get_by_id(db, staff_id, include_inactive=True)
+            if staff is None:
+                raise StaffNotFoundException()
 
-        staff = await StaffRepository.restore(db, staff)
+            staff = await StaffRepository.restore(db, staff)
+            await db.commit()
+            await db.refresh(staff)
+        except Exception:
+            await db.rollback()
+            raise
         library_api.info(
             "Staff restored: %s by %s",
             staff.email,

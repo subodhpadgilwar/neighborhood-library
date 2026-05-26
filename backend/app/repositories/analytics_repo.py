@@ -1,6 +1,5 @@
 """Repository layer for analytics database operations. Contains only database queries — no business logic. All business rules belong in the service layer."""
 
-import asyncio
 from datetime import timedelta
 from typing import Any
 
@@ -232,25 +231,17 @@ class AnalyticsRepository:
             LendingRecord.returned_at < today_end,
         )
 
-        (
-            total_books,
-            total_members,
-            active_loans,
-            overdue_loans,
-            total_copies,
-            available_copies,
-            loans_today,
-            returns_today,
-        ) = await asyncio.gather(
-            AnalyticsRepository._count_scalar(db, total_books_stmt),
-            AnalyticsRepository._count_scalar(db, total_members_stmt),
-            AnalyticsRepository._count_scalar(db, active_loans_stmt),
-            AnalyticsRepository._count_scalar(db, overdue_loans_stmt),
-            AnalyticsRepository._count_scalar(db, total_copies_stmt),
-            AnalyticsRepository._count_scalar(db, available_copies_stmt),
-            AnalyticsRepository._count_scalar(db, loans_today_stmt),
-            AnalyticsRepository._count_scalar(db, returns_today_stmt),
+        total_books = await AnalyticsRepository._count_scalar(db, total_books_stmt)
+        total_members = await AnalyticsRepository._count_scalar(db, total_members_stmt)
+        active_loans = await AnalyticsRepository._count_scalar(db, active_loans_stmt)
+        overdue_loans = await AnalyticsRepository._count_scalar(db, overdue_loans_stmt)
+        total_copies = await AnalyticsRepository._count_scalar(db, total_copies_stmt)
+        available_copies = await AnalyticsRepository._count_scalar(
+            db,
+            available_copies_stmt,
         )
+        loans_today = await AnalyticsRepository._count_scalar(db, loans_today_stmt)
+        returns_today = await AnalyticsRepository._count_scalar(db, returns_today_stmt)
 
         return {
             "total_books": total_books,

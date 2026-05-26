@@ -7,7 +7,7 @@ import uuid
 from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
-from sqlalchemy import CheckConstraint, Integer, String
+from sqlalchemy import CheckConstraint, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -48,6 +48,13 @@ class Book(Base, AuditMixin):
     __table_args__ = (
         CheckConstraint("copies_available >= 0", name="ck_books_copies_available_nonneg"),
         CheckConstraint("copies_total >= 1", name="ck_books_copies_total_min"),
+        CheckConstraint(
+            "copies_available <= copies_total",
+            name="ck_books_copies_available_lte_total",
+        ),
+        Index("ix_books_title", "title"),
+        Index("ix_books_author", "author"),
+        Index("ix_books_genre", "genre"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

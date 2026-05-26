@@ -7,7 +7,7 @@ import uuid
 from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
-from sqlalchemy import String
+from sqlalchemy import Index, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +37,7 @@ class Member(Base, AuditMixin):
     """
 
     __tablename__ = "members"
+    __table_args__ = (Index("ix_members_name", "name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
