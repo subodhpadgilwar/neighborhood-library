@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_staff, get_db
+from app.api.deps import get_current_staff, get_db, require_admin
 from app.models.staff import Staff
 from app.schemas.staff import (
     AdminChangePasswordRequest,
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/staff", tags=["Staff"])
 @router.get("/", response_model=list[StaffResponse])
 async def list_staff(
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
     include_inactive: bool = False,
 ) -> list[StaffResponse]:
     """List staff accounts with optional inclusion of deactivated users."""
@@ -37,7 +37,7 @@ async def list_staff(
 async def create_staff(
     data: StaffCreate,
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
 ) -> StaffResponse:
     """Create a new staff account."""
     staff = await StaffService.create(db, data, current_staff)
@@ -59,7 +59,7 @@ async def change_own_password(
 async def get_staff(
     staff_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
 ) -> StaffResponse:
     """Get a single staff account by id."""
     staff = await StaffService.get_by_id(db, staff_id)
@@ -71,7 +71,7 @@ async def update_staff(
     staff_id: UUID,
     data: StaffUpdate,
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
 ) -> StaffResponse:
     """Update another staff member's profile fields."""
     staff = await StaffService.update(db, staff_id, data, current_staff)
@@ -82,7 +82,7 @@ async def update_staff(
 async def delete_staff(
     staff_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
 ) -> StaffResponse:
     """Deactivate a staff account; blocks default admin and self-deactivation."""
     staff = await StaffService.soft_delete(db, staff_id, current_staff)
@@ -93,7 +93,7 @@ async def delete_staff(
 async def restore_staff(
     staff_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
 ) -> StaffResponse:
     """Restore a previously deactivated staff account."""
     staff = await StaffService.restore(db, staff_id, current_staff)
@@ -105,7 +105,7 @@ async def admin_change_password(
     staff_id: UUID,
     data: AdminChangePasswordRequest,
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
 ) -> StaffResponse:
     """Reset another staff member's password (admin action)."""
     staff = await StaffService.admin_change_password(db, staff_id, data, current_staff)

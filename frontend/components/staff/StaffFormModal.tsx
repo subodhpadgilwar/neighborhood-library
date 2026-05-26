@@ -8,9 +8,16 @@ import { FormDialog } from "@/components/shared/FormDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { isValidEmail, isValidPassword, PASSWORD_HINT } from "@/lib/password";
 import { staffService } from "@/services";
-import type { Staff, StaffCreate, StaffUpdate } from "@/types";
+import type { Staff, StaffCreate, StaffRole, StaffUpdate } from "@/types";
 
 type ApiClientError = { status: string; message: string };
 
@@ -25,6 +32,7 @@ interface StaffFormModalProps {
 interface FormState {
   full_name: string;
   email: string;
+  role: StaffRole;
   password: string;
   confirm_password: string;
 }
@@ -32,6 +40,7 @@ interface FormState {
 const emptyForm: FormState = {
   full_name: "",
   email: "",
+  role: "staff",
   password: "",
   confirm_password: "",
 };
@@ -40,6 +49,7 @@ function staffToForm(staff: Staff): FormState {
   return {
     full_name: staff.full_name,
     email: staff.email,
+    role: staff.role,
     password: "",
     confirm_password: "",
   };
@@ -155,6 +165,7 @@ export function StaffFormModal({
         const payload: StaffCreate = {
           full_name: form.full_name.trim(),
           email: form.email.trim(),
+          role: form.role,
           password: form.password,
         };
         await staffService.create(payload);
@@ -163,6 +174,7 @@ export function StaffFormModal({
         const payload: StaffUpdate = {
           full_name: form.full_name.trim(),
           email: form.email.trim(),
+          role: form.role,
         };
         await staffService.update(initialData.id, payload);
         toast.success("Staff member updated successfully");
@@ -237,6 +249,25 @@ export function StaffFormModal({
             {fieldErrors.email ? (
               <p className="text-xs text-destructive">{fieldErrors.email}</p>
             ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="staff-role">Role</Label>
+            <Select
+              value={form.role}
+              onValueChange={(role) =>
+                setForm((prev) => ({ ...prev, role: role as StaffRole }))
+              }
+              disabled={isSubmitting || initialData?.is_default_admin}
+            >
+              <SelectTrigger id="staff-role" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="staff">Staff</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {isCreate ? (

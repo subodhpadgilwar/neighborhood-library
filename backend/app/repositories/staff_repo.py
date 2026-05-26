@@ -129,6 +129,7 @@ class StaffRepository:
             email=str(data.email),
             full_name=data.full_name,
             hashed_password=hash_password(data.password),
+            role=data.role,
         )
         db.add(staff)
         await db.flush()

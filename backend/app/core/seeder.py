@@ -129,6 +129,11 @@ async def seed_default_admin(db: AsyncSession) -> Staff | None:
         admin_email = str(settings.admin_email)
         existing = await get_staff_by_email(db, admin_email)
         if existing is not None:
+            if existing.is_default_admin and existing.role != "admin":
+                existing.role = "admin"
+                await db.commit()
+                await db.refresh(existing)
+                library_api.info("Default admin promoted to admin role")
             library_api.info("Default admin exists, skipping")
             return existing
 
@@ -137,6 +142,7 @@ async def seed_default_admin(db: AsyncSession) -> Staff | None:
             hashed_password=hash_password(settings.admin_password),
             full_name=settings.admin_full_name,
             is_default_admin=True,
+            role="admin",
         )
         db.add(staff)
         await db.commit()

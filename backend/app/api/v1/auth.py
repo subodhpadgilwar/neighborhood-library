@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_staff, get_db
+from app.api.deps import get_current_staff, get_db, require_admin
 from app.core.exceptions import InvalidCredentialsException
 from app.core.security import create_access_token
 from app.models.staff import Staff
@@ -45,9 +45,9 @@ async def login(
 async def register(
     data: StaffCreate,
     db: AsyncSession = Depends(get_db),
-    current_staff: Staff = Depends(get_current_staff),
+    current_staff: Staff = Depends(require_admin),
 ) -> StaffResponse:
-    """Register a new staff account; requires an authenticated staff JWT."""
+    """Register a new staff account; requires an admin staff JWT."""
     staff = await StaffService.create(db, data, current_staff)
     return StaffResponse.model_validate(staff)
 

@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     admin_email: EmailStr = "admin@example.com"
     admin_password: str = "change-me"
     admin_full_name: str = "Admin User"
+    seed_sample_data: bool = False
 
     # Timezone
     app_timezone: str = "Asia/Kolkata"
@@ -66,6 +67,29 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         """Return True when ``app_env`` is ``development`` (case-insensitive)."""
         return self.app_env.lower() == "development"
+
+    def validate_runtime_safety(self) -> None:
+        """Reject unsafe defaults in non-development environments."""
+        if self.is_development:
+            return
+
+        unsafe_values = {
+            "change-me",
+            "change-me-to-a-long-random-secret",
+            "admin@example.com",
+        }
+        if self.secret_key in unsafe_values or len(self.secret_key) < 32:
+            raise RuntimeError(
+                "SECRET_KEY must be a strong non-default value outside development"
+            )
+        if self.admin_password in unsafe_values or len(self.admin_password) < 12:
+            raise RuntimeError(
+                "ADMIN_PASSWORD must be a strong non-default value outside development"
+            )
+        if str(self.admin_email) in unsafe_values:
+            raise RuntimeError(
+                "ADMIN_EMAIL must be a non-default value outside development"
+            )
 
 
 settings = Settings()

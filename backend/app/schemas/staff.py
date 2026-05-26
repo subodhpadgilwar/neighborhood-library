@@ -2,12 +2,14 @@
 
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.core.timezone import to_local
+
+StaffRole = Literal["admin", "staff"]
 
 
 def _validate_password_strength(password: str) -> str:
@@ -42,6 +44,7 @@ class StaffCreate(StaffBase):
     """Schema for creating a new staff account with password."""
 
     password: str = Field(min_length=8)
+    role: StaffRole = "staff"
 
     @field_validator("password")
     @classmethod
@@ -65,6 +68,7 @@ class StaffUpdate(BaseModel):
 
     full_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     email: Optional[EmailStr] = None
+    role: Optional[StaffRole] = None
 
 
 class ChangePasswordRequest(BaseModel):
@@ -148,6 +152,7 @@ class StaffResponse(BaseModel):
     id: UUID
     email: EmailStr
     full_name: str
+    role: StaffRole
     is_active: bool
     is_default_admin: bool
     created_at: datetime

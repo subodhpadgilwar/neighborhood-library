@@ -74,17 +74,13 @@ class LendingService:
         if due_date is None:
             calculated_due = now_utc() + timedelta(days=14)
         else:
-            if to_utc(due_date) <= now_utc():
+            utc_due_date = to_utc(due_date)
+            if utc_due_date is None or utc_due_date <= now_utc():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Due date must be after current date and time",
                 )
-            calculated_due = to_utc(due_date)
-            if calculated_due is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Due date must be after current date and time",
-                )
+            calculated_due = utc_due_date
 
         try:
             book = await BookRepository.get_by_id_for_update(db, book_id)

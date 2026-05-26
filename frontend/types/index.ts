@@ -24,6 +24,7 @@ export type {
 export type {
   Staff,
   StaffCreate,
+  StaffRole,
   StaffUpdate,
   ChangePasswordRequest,
   AdminChangePasswordRequest,

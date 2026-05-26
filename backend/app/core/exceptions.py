@@ -145,3 +145,18 @@ class InvalidTokenException(HTTPException):
             detail="Token is invalid or expired",
             headers=_BEARER_AUTH_HEADERS,
         )
+
+
+# ---------------------------------------------------------------------------
+# 403 Forbidden
+# ---------------------------------------------------------------------------
+
+
+class AdminRequiredException(HTTPException):
+    """Raised when a staff account lacks permission for an admin-only action."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges are required for this action",
+        )

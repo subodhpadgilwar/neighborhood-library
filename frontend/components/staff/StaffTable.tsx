@@ -89,6 +89,8 @@ export function StaffTable({
       cell: (member) =>
         member.is_default_admin ? (
           <Badge variant="secondary">Default Admin</Badge>
+        ) : member.role === "admin" ? (
+          <Badge variant="secondary">Admin</Badge>
         ) : (
           <Badge variant="outline">Staff</Badge>
         ),

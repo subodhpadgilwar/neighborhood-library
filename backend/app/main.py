@@ -38,13 +38,14 @@ async def lifespan(app: FastAPI):
     Yields:
         Control to the running application between startup and shutdown.
     """
+    settings.validate_runtime_safety()
     library_api.info("Starting Neighborhood Library API")
     library_api.info("Environment: %s", settings.app_env)
     library_api.info("Timezone: %s", settings.app_timezone)
 
     async with AsyncSessionLocal() as db:
         admin = await seed_default_admin(db)
-        if admin is not None:
+        if admin is not None and (settings.is_development or settings.seed_sample_data):
             await seed_sample_books(db, admin.id)
 
     library_api.info("API is ready")

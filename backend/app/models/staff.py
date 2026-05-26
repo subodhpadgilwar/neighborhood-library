@@ -32,6 +32,7 @@ class Staff(Base):
         email: Unique login email (OAuth2 username).
         hashed_password: bcrypt password hash.
         full_name: Display name for UI and audit trails.
+        role: Authorization role (``admin`` or ``staff``).
         is_default_admin: True for the seeded admin account.
         is_active: Soft-delete flag for staff accounts.
         created_at: UTC timestamp when the account was created.
@@ -48,6 +49,7 @@ class Staff(Base):
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     full_name: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="staff", nullable=False)
     is_default_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

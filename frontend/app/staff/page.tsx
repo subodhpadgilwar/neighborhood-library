@@ -106,6 +106,7 @@ export default function StaffPage() {
         id: currentStaff.id,
         full_name: currentStaff.full_name,
         email: currentStaff.email,
+        role: currentStaff.role,
         is_active: currentStaff.is_active ?? true,
         is_default_admin: currentStaff.is_default_admin,
         created_at: currentStaff.created_at,

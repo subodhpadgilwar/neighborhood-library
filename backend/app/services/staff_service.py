@@ -141,6 +141,18 @@ class StaffService:
                     if existing is not None:
                         raise DuplicateEmailException(new_email)
 
+            if data.role is not None and data.role != staff.role:
+                if staff.is_default_admin:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Cannot change the default admin role",
+                    )
+                if staff.id == current_staff.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Cannot change your own role",
+                    )
+
             staff = await StaffRepository.update(db, staff, data)
             await db.commit()
             await db.refresh(staff)

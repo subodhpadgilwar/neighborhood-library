@@ -12,7 +12,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import InvalidTokenException
+from app.core.exceptions import AdminRequiredException, InvalidTokenException
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.staff import Staff
@@ -56,3 +56,12 @@ async def get_current_staff(
         raise InvalidTokenException()
 
     return staff
+
+
+async def require_admin(
+    current_staff: Staff = Depends(get_current_staff),
+) -> Staff:
+    """Require the authenticated staff member to have the admin role."""
+    if current_staff.role != "admin":
+        raise AdminRequiredException()
+    return current_staff
