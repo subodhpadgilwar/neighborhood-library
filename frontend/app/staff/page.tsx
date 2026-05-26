@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -15,6 +15,7 @@ import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { useAuth } from "@/lib/authContext";
 import { staffService } from "@/services";
 import type { Staff } from "@/types";
@@ -57,7 +58,7 @@ export default function StaffPage() {
     }
   }, [showInactive]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void fetchStaff();
   }, [fetchStaff]);
 

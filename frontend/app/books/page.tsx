@@ -2,7 +2,7 @@
 
 import { Camera, Plus, Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { BookFormModal } from "@/components/books/BookFormModal";
@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { bookService } from "@/services";
 import type { Book } from "@/types";
@@ -34,7 +36,8 @@ function BooksPageContent() {
   const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput);
   const [sortDirection, setSortDirection] =
     useState<TitleSortDirection>("asc");
   const [page, setPage] = useState(1);
@@ -60,7 +63,7 @@ function BooksPageContent() {
         page,
         limit,
         includeInactive: showInactive,
-        search,
+        search: debouncedSearch,
         sortBy: "title",
         sortOrder: sortDirection,
       });
@@ -77,13 +80,13 @@ function BooksPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [limit, page, search, showInactive, sortDirection]);
+  }, [debouncedSearch, limit, page, showInactive, sortDirection]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void loadBooks();
   }, [loadBooks]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (searchParams.get("action") === "add") {
       setEditingBook(null);
       setModalOpen(true);
@@ -91,11 +94,11 @@ function BooksPageContent() {
     }
   }, [searchParams, router]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     setPage(1);
-  }, [search, showInactive, sortDirection]);
+  }, [debouncedSearch, showInactive, sortDirection]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (totalPages > 0 && page > totalPages) {
       setPage(totalPages);
     }
@@ -125,7 +128,7 @@ function BooksPageContent() {
 
     try {
       const book = await bookService.getByISBN(isbn);
-      setSearch(book.title);
+      setSearchInput(book.title);
       setHighlightedBookId(book.id);
       setPage(1);
       toast.success(`Book found: ${book.title}`);
@@ -204,9 +207,9 @@ function BooksPageContent() {
                 <Input
                   type="search"
                   placeholder="Search by title or author…"
-                  value={search}
+                  value={searchInput}
                   onChange={(e) => {
-                    setSearch(e.target.value);
+                    setSearchInput(e.target.value);
                     setHighlightedBookId(null);
                   }}
                   className="pl-8"

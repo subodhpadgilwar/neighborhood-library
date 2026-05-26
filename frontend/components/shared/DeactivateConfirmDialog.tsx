@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 
 type ApiClientError = { status: string; message: string };
 
@@ -49,7 +50,7 @@ export function DeactivateConfirmDialog({
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (isOpen) {
       setApiError(null);
     }

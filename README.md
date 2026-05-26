@@ -19,7 +19,7 @@ The backend is built for clarity and maintainability using async Python, Postgre
 
 ## Frontend
 
-- Next.js 14 with App Router
+- Next.js 16 with App Router
 - shadcn/ui component library
 - TypeScript throughout
 - Axios with JWT interceptors
@@ -33,6 +33,7 @@ The backend is built for clarity and maintainability using async Python, Postgre
 | Books | `/books` | Manage library books |
 | Members | `/members` | Manage library members |
 | Lending | `/lending` | Borrow and return operations |
+| Staff | `/staff` | Manage staff accounts and roles |
 
 ## Default Login
 
@@ -55,6 +56,7 @@ Step-by-step manual test flow:
 6. Return the book
 7. Try borrowing a book with 0 copies → should show error
 8. Check overdue tab (will be empty on fresh install)
+9. Confirm non-admin staff can change their own password but cannot manage other staff
 
 ## Architecture
 
@@ -218,17 +220,29 @@ Configure these in `backend/.env`:
 | `ADMIN_EMAIL` | Default admin email (seeder) | `admin@example.com` | Yes |
 | `ADMIN_PASSWORD` | Default admin password (seeder) | `change-me` | Yes |
 | `ADMIN_FULL_NAME` | Default admin display name | `Admin User` | Yes |
+| `SEED_SAMPLE_DATA` | Seed sample books outside development | `false` | No |
 | `APP_TIMEZONE` | Timezone for API responses | `Asia/Kolkata` | No |
 | `LOG_LEVEL` | Logging level | `INFO` | No |
 | `LOG_RETENTION_DAYS` | Days of rotated log files to keep | `30` | No |
 
 ## Default Admin
 
-On every startup, the application runs an **idempotent seeder** that ensures a default staff account exists using `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `ADMIN_FULL_NAME` from `.env`. If the account already exists, seeding is skipped.
+On every startup, the application runs an **idempotent seeder** that ensures a default staff account exists using `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `ADMIN_FULL_NAME` from `.env`. The seeded account is assigned the `admin` role. If the account already exists, seeding is skipped and legacy default admins are promoted to `admin`.
 
-**Important:** Change the default admin password after your first login. Do not use default credentials in production.
+**Important:** Change the default admin password after your first login. Non-development environments reject weak default `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` values at startup.
+
+Sample books seed automatically in development. Outside development, sample data is only seeded when `SEED_SAMPLE_DATA=true`.
 
 Log in via `POST /api/v1/auth/login` (OAuth2 form: `username` = email, `password` = password), then use the returned Bearer token for protected routes.
+
+## Authorization
+
+Staff accounts have one of two roles:
+
+- `admin`: Can manage staff accounts, create staff, restore/deactivate staff, and reset another staff member's password.
+- `staff`: Can use regular library workflows and change their own password.
+
+Admin-only routes return `403` when called by non-admin staff.
 
 ## API Documentation
 
@@ -243,7 +257,7 @@ Base URL: `http://localhost:8000`
 |--------|----------|-------------|---------------|
 | GET | `/health` | Health check for Docker/monitoring | No |
 | POST | `/api/v1/auth/login` | Staff login (returns JWT) | No |
-| POST | `/api/v1/auth/register` | Register additional staff | Yes |
+| POST | `/api/v1/auth/register` | Register additional staff | Admin |
 | GET | `/api/v1/auth/me` | Current staff profile | Yes |
 | GET | `/api/v1/books` | List books (pagination) | No |
 | POST | `/api/v1/books` | Create a book | Yes |
@@ -259,6 +273,13 @@ Base URL: `http://localhost:8000`
 | PUT | `/api/v1/lending/{id}/return` | Return a borrowed book | Yes |
 | GET | `/api/v1/lending` | List all active loans | Yes |
 | GET | `/api/v1/lending/overdue` | List overdue loans | Yes |
+| GET | `/api/v1/staff` | List staff accounts | Admin |
+| POST | `/api/v1/staff` | Create a staff account | Admin |
+| PUT | `/api/v1/staff/me/change-password` | Change own password | Yes |
+| PUT | `/api/v1/staff/{id}` | Update a staff account | Admin |
+| DELETE | `/api/v1/staff/{id}` | Deactivate a staff account | Admin |
+| PUT | `/api/v1/staff/{id}/restore` | Restore a staff account | Admin |
+| PUT | `/api/v1/staff/{id}/change-password` | Reset another staff password | Admin |
 
 Protected routes require header: `Authorization: Bearer <access_token>`.
 
@@ -266,7 +287,7 @@ Protected routes require header: `Authorization: Bearer <access_token>`.
 
 | Table | Description |
 |-------|-------------|
-| **staff** | Library staff accounts (email, hashed password, admin flag). Does not use the shared audit mixin. |
+| **staff** | Library staff accounts (email, hashed password, role, default admin flag). Does not use the shared audit mixin. |
 | **books** | Catalog entries with title, author, optional ISBN/genre, and copy counters (`copies_total`, `copies_available`). |
 | **members** | Patrons who borrow books (name, email, optional phone/address). |
 | **lending_records** | Borrow events linking a book and member with `borrowed_at`, `due_date`, and optional `returned_at`. |
@@ -283,11 +304,27 @@ A loan with `returned_at = NULL` is considered active. Overdue loans are active 
 
 - **UTC storage, local time serving** — Timestamps are persisted in UTC (`DateTime(timezone=True)`). API responses convert to `APP_TIMEZONE` for display.
 - **Layered architecture** — Routes, services, and repositories are separated to keep HTTP, business rules, and SQL concerns isolated.
+- **Role-based staff management** — Admin-only staff operations are enforced through FastAPI dependencies, while all active staff can change their own password.
 - **`copies_available` counter** — Availability is tracked with a denormalized counter updated on borrow/return for fast checks and simple constraints.
-- **Idempotent seeder** — Default admin creation is safe to run on every startup and never blocks application boot on failure.
+- **Guarded seeding** — Default admin creation is safe to run on every startup; sample books are limited to development unless explicitly enabled.
 - **Custom exceptions** — Services raise typed `HTTPException` subclasses for consistent status codes and messages.
+- **Debounced list search** — Books and members debounce search input before sending paginated API requests.
 - **Rotating file logs** — Daily log rotation with configurable retention; console and file handlers use the application timezone in log timestamps.
 
 ## Running Tests
 
-Tests coming soon.
+Backend:
+
+```bash
+cd backend
+python -m pytest
+python -m alembic heads
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```

@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { formatLoanDate } from "@/components/lending/loanUtils";
@@ -23,6 +23,7 @@ import {
   isoToDateInputValue,
   isCalendarDayBefore,
 } from "@/lib/dateUtils";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { cn } from "@/lib/utils";
 import { lendingService } from "@/services";
 import type { Lending } from "@/types";
@@ -50,7 +51,7 @@ export function UpdateDueDateModal({
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!isOpen) {
       return;
     }

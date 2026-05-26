@@ -2,7 +2,7 @@
 
 import { startOfDay } from "date-fns";
 import { AlertTriangle, Camera, Check, Loader2, X } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { formatLoanDate } from "@/components/lending/loanUtils";
@@ -26,6 +26,7 @@ import {
   formatDateInputValue,
   isCalendarDayBefore,
 } from "@/lib/dateUtils";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { cn } from "@/lib/utils";
 import { bookService, lendingService, memberService } from "@/services";
@@ -88,7 +89,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
     return availableBooks;
   }, [availableBooks, scannedBook]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) {
       return;
     }

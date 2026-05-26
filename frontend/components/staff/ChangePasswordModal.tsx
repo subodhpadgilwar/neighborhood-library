@@ -1,7 +1,7 @@
 "use client";
 
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { isValidPassword, PASSWORD_HINT } from "@/lib/password";
 import { staffService } from "@/services";
 import type { Staff } from "@/types";
@@ -98,7 +99,7 @@ export function ChangePasswordModal({
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!isOpen) {
       return;
     }

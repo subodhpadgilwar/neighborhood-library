@@ -12,3 +12,4 @@ pytz
 python-dotenv
 python-multipart
 pytest
+httpx

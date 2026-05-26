@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Filter } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
   dateInputToStartOfDayIso,
   isoToDateInputValue,
 } from "@/lib/dateUtils";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { cn } from "@/lib/utils";
 import type { LendingFilters as LendingFiltersState } from "@/types";
 
@@ -77,54 +78,52 @@ export function LendingFilters({
   );
 
   const activeCount = useMemo(() => countActiveFilters(filters), [filters]);
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     setBookTitleInput(filters.book_title ?? "");
   }, [filters.book_title]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     setMemberNameInput(filters.member_name ?? "");
   }, [filters.member_name]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     setBorrowedFromInput(isoToDateInput(filters.borrowed_from));
   }, [filters.borrowed_from]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     setBorrowedToInput(isoToDateInput(filters.borrowed_to));
   }, [filters.borrowed_to]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const trimmed = bookTitleInput.trim();
-      if ((filtersRef.current.book_title ?? "") === trimmed) {
+      if ((filters.book_title ?? "") === trimmed) {
         return;
       }
       onChange({
-        ...filtersRef.current,
+        ...filters,
         book_title: trimmed || undefined,
       });
     }, 400);
 
     return () => window.clearTimeout(timer);
-  }, [bookTitleInput]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bookTitleInput, filters, onChange]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const trimmed = memberNameInput.trim();
-      if ((filtersRef.current.member_name ?? "") === trimmed) {
+      if ((filters.member_name ?? "") === trimmed) {
         return;
       }
       onChange({
-        ...filtersRef.current,
+        ...filters,
         member_name: trimmed || undefined,
       });
     }, 400);
 
     return () => window.clearTimeout(timer);
-  }, [memberNameInput]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [memberNameInput, filters, onChange]);
 
   function updateFilters(patch: Partial<LendingFiltersState>) {
     onChange({ ...filters, ...patch });

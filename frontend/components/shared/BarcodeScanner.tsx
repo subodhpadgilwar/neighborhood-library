@@ -5,7 +5,7 @@ import {
   type IScannerControls,
 } from "@zxing/browser";
 import { Check, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { cn } from "@/lib/utils";
 
@@ -94,7 +95,7 @@ export function BarcodeScanner({
     handleClose();
   }, [manualISBN, onScan, stopScanner, handleClose, transformScan]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!isOpen) {
       stopScanner();
       return;

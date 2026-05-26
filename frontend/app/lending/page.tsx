@@ -2,7 +2,7 @@
 
 import { ArrowLeftRight } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ActiveLoansTable } from "@/components/lending/ActiveLoansTable";
@@ -17,6 +17,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { lendingService } from "@/services";
 import type { Lending, LendingFilters as LendingFiltersState, LendingHistoryResponse } from "@/types";
 
@@ -103,31 +104,31 @@ function LendingPageContent() {
     }
   }, [historyFilters]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void loadLoans();
   }, [loadLoans]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     setTab(resolveTab(searchParams.get("tab")));
     if (searchParams.get("tab") === "history") {
       setHistoryTabOpened(true);
     }
   }, [searchParams]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (searchParams.get("action") === "borrow") {
       setBorrowModalOpen(true);
       router.replace("/lending", { scroll: false });
     }
   }, [searchParams, router]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (tab === "history") {
       setHistoryTabOpened(true);
     }
   }, [tab]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!historyTabOpened) {
       return;
     }

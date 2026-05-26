@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { cn } from "@/lib/utils";
 import { analyticsService } from "@/services";
 import type { MonthlyLendingStats } from "@/types";
@@ -70,7 +71,7 @@ export function MonthlyLendingChart() {
     }
   }, []);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void loadData(months);
   }, [months, loadData]);
 

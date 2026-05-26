@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { FormDialog } from "@/components/shared/FormDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { memberService } from "@/services";
 import type { Member, MemberCreate, MemberUpdate } from "@/types";
 
@@ -68,7 +69,7 @@ export function MemberFormModal({
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) {
       return;
     }

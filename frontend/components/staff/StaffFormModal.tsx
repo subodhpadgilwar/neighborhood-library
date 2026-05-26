@@ -1,7 +1,7 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { FormDialog } from "@/components/shared/FormDialog";
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { isValidEmail, isValidPassword, PASSWORD_HINT } from "@/lib/password";
 import { staffService } from "@/services";
 import type { Staff, StaffCreate, StaffRole, StaffUpdate } from "@/types";
@@ -114,7 +115,7 @@ export function StaffFormModal({
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!isOpen) {
       return;
     }

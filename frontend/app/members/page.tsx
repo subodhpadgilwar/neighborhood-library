@@ -2,7 +2,7 @@
 
 import { Search, UserPlus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useDeferredEffect } from "@/hooks/useDeferredEffect";
 import { memberService } from "@/services";
 import type { Member } from "@/types";
 
@@ -30,7 +32,8 @@ function MembersPageContent() {
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [totalMembers, setTotalMembers] = useState(0);
@@ -51,7 +54,7 @@ function MembersPageContent() {
         page,
         limit,
         includeInactive: showInactive,
-        search,
+        search: debouncedSearch,
         sortBy: "name",
         sortOrder: "asc",
       });
@@ -68,13 +71,13 @@ function MembersPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [limit, page, search, showInactive]);
+  }, [debouncedSearch, limit, page, showInactive]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void loadMembers();
   }, [loadMembers]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (searchParams.get("action") === "register") {
       setEditingMember(null);
       setFormModalOpen(true);
@@ -82,11 +85,11 @@ function MembersPageContent() {
     }
   }, [searchParams, router]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     setPage(1);
-  }, [search, showInactive]);
+  }, [debouncedSearch, showInactive]);
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (totalPages > 0 && page > totalPages) {
       setPage(totalPages);
     }
@@ -178,8 +181,8 @@ function MembersPageContent() {
               <Input
                 type="search"
                 placeholder="Search by name or email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-8"
                 disabled={isLoading}
               />
