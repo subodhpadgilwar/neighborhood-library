@@ -8,7 +8,6 @@ import math
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +16,14 @@ from app.core.exceptions import (
     AlreadyReturnedException,
     BookNotAvailableException,
     BookNotFoundException,
+    CannotUpdateReturnedLoanException,
+    InvalidDueDateException,
     LendingNotFoundException,
     MemberNotFoundException,
 )
 from app.core.logger import library_api
 from app.core.timezone import now_utc, to_local, to_utc
+from app.core.unit_of_work import transaction
 from app.models.lending import LendingRecord
 from app.repositories.book_repo import BookRepository
 from app.repositories.lending_repo import LendingRepository
@@ -76,51 +78,49 @@ class LendingService:
         else:
             utc_due_date = to_utc(due_date)
             if utc_due_date is None or utc_due_date <= now_utc():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Due date must be after current date and time",
+                raise InvalidDueDateException(
+                    "Due date must be after current date and time",
                 )
             calculated_due = utc_due_date
 
+        lending_id: UUID
         try:
-            book = await BookRepository.get_by_id_for_update(db, book_id)
-            if book is None:
-                raise BookNotFoundException(book_id)
+            async with transaction(db):
+                book = await BookRepository.get_by_id_for_update(db, book_id)
+                if book is None:
+                    raise BookNotFoundException(book_id)
 
-            member = await MemberRepository.get_by_id(db, member_id)
-            if member is None:
-                raise MemberNotFoundException(member_id)
+                member = await MemberRepository.get_by_id(db, member_id)
+                if member is None:
+                    raise MemberNotFoundException(member_id)
 
-            if book.copies_available <= 0:
-                raise BookNotAvailableException()
+                if book.copies_available <= 0:
+                    raise BookNotAvailableException()
 
-            active_loan = await LendingRepository.get_active_loan(
-                db,
-                book_id,
-                member_id,
-            )
-            if active_loan is not None:
-                raise AlreadyBorrowedException()
+                active_loan = await LendingRepository.get_active_loan(
+                    db,
+                    book_id,
+                    member_id,
+                )
+                if active_loan is not None:
+                    raise AlreadyBorrowedException()
 
-            lending = await LendingRepository.create_loan(
-                db,
-                book_id,
-                member_id,
-                staff_id,
-                calculated_due,
-            )
-            await BookRepository.decrement_copies(db, book)
-            lending_id = lending.id
-            await db.commit()
+                lending = await LendingRepository.create_loan(
+                    db,
+                    book_id,
+                    member_id,
+                    staff_id,
+                    calculated_due,
+                )
+                await BookRepository.decrement_copies(db, book)
+                lending_id = lending.id
         except IntegrityError as exc:
-            await db.rollback()
             raise AlreadyBorrowedException() from exc
-        except Exception:
-            await db.rollback()
-            raise
 
         loaded = await LendingRepository.get_by_id(db, lending_id)
-        lending = loaded if loaded is not None else lending
+        if loaded is None:
+            raise LendingNotFoundException()
+        lending = loaded
         library_api.info(
             "Book borrowed: book=%s member=%s due=%s",
             book_id,
@@ -149,7 +149,8 @@ class LendingService:
             LendingNotFoundException: If no lending record exists for the id.
             AlreadyReturnedException: If the book was already returned.
         """
-        try:
+        updated_id: UUID
+        async with transaction(db):
             lending = await LendingRepository.get_by_id_for_update(db, lending_id)
             if lending is None:
                 raise LendingNotFoundException()
@@ -167,10 +168,6 @@ class LendingService:
             if book is not None and book.copies_available < book.copies_total:
                 await BookRepository.increment_copies(db, book)
             updated_id = lending.id
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
 
         loaded = await LendingRepository.get_by_id(db, updated_id)
         lending = loaded if loaded is not None else lending
@@ -197,32 +194,26 @@ class LendingService:
 
         Raises:
             LendingNotFoundException: If no lending record exists for the id.
-            HTTPException: If the loan is already returned, the due date is in
-                the past, or it precedes the borrow date.
+            InvalidDueDateException: If the due date is invalid for this loan.
+            CannotUpdateReturnedLoanException: If the loan is already returned.
         """
-        try:
+        utc_due_date = to_utc(due_date)
+        updated_id: UUID
+        async with transaction(db):
             lending = await LendingRepository.get_by_id_for_update(db, lending_id)
             if lending is None:
                 raise LendingNotFoundException()
 
             if lending.returned_at is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot update due date of returned book",
-                )
+                raise CannotUpdateReturnedLoanException()
 
-            utc_due_date = to_utc(due_date)
             if utc_due_date is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Due date cannot be set in the past",
-                )
+                raise InvalidDueDateException("Due date cannot be set in the past")
 
             if utc_due_date < lending.borrowed_at:
                 borrowed_local = to_local(lending.borrowed_at)
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Due date cannot be before borrow date ({borrowed_local})",
+                raise InvalidDueDateException(
+                    f"Due date cannot be before borrow date ({borrowed_local})",
                 )
 
             lending = await LendingRepository.update_due_date(
@@ -232,10 +223,6 @@ class LendingService:
                 staff_id,
             )
             updated_id = lending.id
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
 
         loaded = await LendingRepository.get_by_id(db, updated_id)
         lending = loaded if loaded is not None else lending

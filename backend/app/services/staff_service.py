@@ -7,12 +7,22 @@ validation that requires database context live here.
 import math
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import DuplicateEmailException, StaffNotFoundException
+from app.core.exceptions import (
+    CannotChangeDefaultAdminRoleException,
+    CannotChangeOwnRoleException,
+    CannotDeactivateDefaultAdminException,
+    CannotDeactivateSelfException,
+    DuplicateEmailException,
+    IncorrectPasswordException,
+    PasswordUnchangedException,
+    StaffNotFoundException,
+)
 from app.core.logger import library_api
 from app.core.security import verify_password
+from app.core.unit_of_work import transaction
 from app.models.staff import Staff
 from app.repositories.staff_repo import StaffRepository
 from app.schemas.staff import (
@@ -126,16 +136,16 @@ class StaffService:
         """
         email = str(data.email)
         try:
-            existing = await StaffRepository.get_by_email(db, email)
-            if existing is not None:
-                raise DuplicateEmailException(email)
+            async with transaction(db):
+                existing = await StaffRepository.get_by_email(db, email)
+                if existing is not None:
+                    raise DuplicateEmailException(email)
 
-            staff = await StaffRepository.create(db, data)
-            await db.commit()
+                staff = await StaffRepository.create(db, data)
             await db.refresh(staff)
-        except Exception:
-            await db.rollback()
-            raise
+        except IntegrityError as exc:
+            raise DuplicateEmailException(email) from exc
+
         library_api.info(
             "Staff created: %s by %s",
             staff.email,
@@ -165,7 +175,7 @@ class StaffService:
             StaffNotFoundException: If the staff account does not exist.
             DuplicateEmailException: If the new email belongs to another account.
         """
-        try:
+        async with transaction(db):
             staff = await StaffRepository.get_by_id(db, staff_id)
             if staff is None:
                 raise StaffNotFoundException()
@@ -179,22 +189,13 @@ class StaffService:
 
             if data.role is not None and data.role != staff.role:
                 if staff.is_default_admin:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Cannot change the default admin role",
-                    )
+                    raise CannotChangeDefaultAdminRoleException()
                 if staff.id == current_staff.id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Cannot change your own role",
-                    )
+                    raise CannotChangeOwnRoleException()
 
             staff = await StaffRepository.update(db, staff, data)
-            await db.commit()
-            await db.refresh(staff)
-        except Exception:
-            await db.rollback()
-            raise
+
+        await db.refresh(staff)
         library_api.info(
             "Staff updated: %s by %s",
             staff.email,
@@ -219,27 +220,19 @@ class StaffService:
             The Staff model with an updated password hash.
 
         Raises:
-            HTTPException: If the current password is wrong or matches the new one.
+            IncorrectPasswordException: If the current password is wrong.
+            PasswordUnchangedException: If the new password matches the current one.
         """
         if not verify_password(data.current_password, staff.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect",
-            )
+            raise IncorrectPasswordException()
 
         if verify_password(data.new_password, staff.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password must differ from current",
-            )
+            raise PasswordUnchangedException()
 
-        try:
+        async with transaction(db):
             staff = await StaffRepository.update_password(db, staff, data.new_password)
-            await db.commit()
-            await db.refresh(staff)
-        except Exception:
-            await db.rollback()
-            raise
+
+        await db.refresh(staff)
         library_api.info("Password changed for: %s", staff.email)
         return staff
 
@@ -264,17 +257,14 @@ class StaffService:
         Raises:
             StaffNotFoundException: If the target staff account does not exist.
         """
-        try:
+        async with transaction(db):
             staff = await StaffRepository.get_by_id(db, staff_id)
             if staff is None:
                 raise StaffNotFoundException()
 
             staff = await StaffRepository.update_password(db, staff, data.new_password)
-            await db.commit()
-            await db.refresh(staff)
-        except Exception:
-            await db.rollback()
-            raise
+
+        await db.refresh(staff)
         library_api.info(
             "Admin %s changed password for %s",
             current_staff.email,
@@ -300,31 +290,23 @@ class StaffService:
 
         Raises:
             StaffNotFoundException: If the staff account does not exist.
-            HTTPException: If targeting the default admin or the caller's own account.
+            CannotDeactivateDefaultAdminException: If targeting the default admin.
+            CannotDeactivateSelfException: If the caller deactivates themselves.
         """
-        try:
+        async with transaction(db):
             staff = await StaffRepository.get_by_id(db, staff_id)
             if staff is None:
                 raise StaffNotFoundException()
 
             if staff.is_default_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot deactivate the default admin",
-                )
+                raise CannotDeactivateDefaultAdminException()
 
             if staff.id == current_staff.id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot deactivate your own account",
-                )
+                raise CannotDeactivateSelfException()
 
             staff = await StaffRepository.soft_delete(db, staff)
-            await db.commit()
-            await db.refresh(staff)
-        except Exception:
-            await db.rollback()
-            raise
+
+        await db.refresh(staff)
         library_api.info(
             "Staff soft deleted: %s by %s",
             staff.email,
@@ -351,17 +333,14 @@ class StaffService:
         Raises:
             StaffNotFoundException: If no staff account exists for the given id.
         """
-        try:
+        async with transaction(db):
             staff = await StaffRepository.get_by_id(db, staff_id, include_inactive=True)
             if staff is None:
                 raise StaffNotFoundException()
 
             staff = await StaffRepository.restore(db, staff)
-            await db.commit()
-            await db.refresh(staff)
-        except Exception:
-            await db.rollback()
-            raise
+
+        await db.refresh(staff)
         library_api.info(
             "Staff restored: %s by %s",
             staff.email,

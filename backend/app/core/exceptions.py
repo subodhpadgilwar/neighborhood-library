@@ -95,6 +95,113 @@ class AlreadyReturnedException(HTTPException):
         )
 
 
+class BookDeactivatedException(HTTPException):
+    """Raised when lookup targets a soft-deleted book."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This book exists but is currently deactivated",
+        )
+
+
+class InvalidCopyCountException(HTTPException):
+    """Raised when total copies would fall below currently borrowed copies."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Total copies cannot be less than currently borrowed copies",
+        )
+
+
+class ActiveLoansException(HTTPException):
+    """Raised when deleting an entity that still has open loans."""
+
+    def __init__(self, *, entity: str, count: int) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete {entity} with {count} active loan(s)",
+        )
+
+
+class InvalidDueDateException(HTTPException):
+    """Raised when a due date is missing, in the past, or not after borrow time."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+class CannotUpdateReturnedLoanException(HTTPException):
+    """Raised when updating due date on a closed loan."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot update due date of returned book",
+        )
+
+
+class IncorrectPasswordException(HTTPException):
+    """Raised when the supplied current password does not match."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+
+class PasswordUnchangedException(HTTPException):
+    """Raised when the new password matches the current password."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must differ from current",
+        )
+
+
+class CannotChangeDefaultAdminRoleException(HTTPException):
+    """Raised when attempting to change the default admin's role."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change the default admin role",
+        )
+
+
+class CannotChangeOwnRoleException(HTTPException):
+    """Raised when staff attempt to change their own role."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change your own role",
+        )
+
+
+class CannotDeactivateDefaultAdminException(HTTPException):
+    """Raised when attempting to deactivate the default admin account."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot deactivate the default admin",
+        )
+
+
+class CannotDeactivateSelfException(HTTPException):
+    """Raised when staff attempt to deactivate their own account."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot deactivate your own account",
+        )
+
+
 # ---------------------------------------------------------------------------
 # 409 Conflict
 # ---------------------------------------------------------------------------

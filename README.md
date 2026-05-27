@@ -313,13 +313,35 @@ A loan with `returned_at = NULL` is considered active. Overdue loans are active 
 
 ## Running Tests
 
-Backend:
+Backend (install dev dependencies first):
 
 ```bash
 cd backend
-python -m pytest
-python -m alembic heads
+pip install -r requirements-dev.txt
 ```
+
+**Unit / API tests** (mocked DB, no PostgreSQL required):
+
+```bash
+python -m pytest -m "not integration"
+```
+
+**Integration tests** (real PostgreSQL + Alembic migrations):
+
+1. Start Postgres (e.g. `docker-compose up -d postgres`).
+2. Create a test database once:  
+   `CREATE DATABASE neighborhood_library_test;`
+3. Set `TEST_DATABASE_URL` if needed (default:  
+   `postgresql+asyncpg://postgres:your_postgres_password@localhost:5433/neighborhood_library_test`).
+4. Run:
+
+```bash
+python -m pytest -m integration
+```
+
+Skip integration tests: `SKIP_INTEGRATION_TESTS=1 python -m pytest`
+
+Run everything: `python -m pytest`
 
 Frontend:
 

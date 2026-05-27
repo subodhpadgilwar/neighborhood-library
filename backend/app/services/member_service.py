@@ -7,12 +7,16 @@ validation that requires database context live here.
 import math
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import DuplicateEmailException, MemberNotFoundException
+from app.core.exceptions import (
+    ActiveLoansException,
+    DuplicateEmailException,
+    MemberNotFoundException,
+)
 from app.core.logger import library_api
+from app.core.unit_of_work import transaction
 from app.models.member import Member
 from app.repositories.lending_repo import LendingRepository
 from app.repositories.member_repo import MemberRepository
@@ -131,21 +135,18 @@ class MemberService:
             DuplicateEmailException: If the email is already registered.
         """
         email = str(data.email)
+        member_id: UUID
         try:
-            existing = await MemberRepository.get_by_email(db, email)
-            if existing is not None:
-                raise DuplicateEmailException(email)
+            async with transaction(db):
+                existing = await MemberRepository.get_by_email(db, email)
+                if existing is not None:
+                    raise DuplicateEmailException(email)
 
-            member = await MemberRepository.create(db, data)
-            member.created_by = staff_id
-            member_id = member.id
-            await db.commit()
+                member = await MemberRepository.create(db, data)
+                member.created_by = staff_id
+                member_id = member.id
         except IntegrityError as exc:
-            await db.rollback()
             raise DuplicateEmailException(email) from exc
-        except Exception:
-            await db.rollback()
-            raise
 
         loaded = await MemberRepository.get_by_id(db, member_id, include_inactive=True)
         member = loaded if loaded is not None else member
@@ -174,29 +175,26 @@ class MemberService:
             MemberNotFoundException: If the member does not exist.
             DuplicateEmailException: If the new email belongs to another member.
         """
+        updated_id: UUID
         try:
-            member = await MemberRepository.get_by_id(db, member_id)
-            if member is None:
-                raise MemberNotFoundException(member_id)
+            async with transaction(db):
+                member = await MemberRepository.get_by_id(db, member_id)
+                if member is None:
+                    raise MemberNotFoundException(member_id)
 
-            if data.email is not None:
-                new_email = str(data.email)
-                if new_email != member.email:
-                    existing = await MemberRepository.get_by_email(db, new_email)
-                    if existing is not None:
-                        raise DuplicateEmailException(new_email)
+                if data.email is not None:
+                    new_email = str(data.email)
+                    if new_email != member.email:
+                        existing = await MemberRepository.get_by_email(db, new_email)
+                        if existing is not None:
+                            raise DuplicateEmailException(new_email)
 
-            member.updated_by = staff_id
-            member = await MemberRepository.update(db, member, data)
-            updated_id = member.id
-            await db.commit()
+                member.updated_by = staff_id
+                member = await MemberRepository.update(db, member, data)
+                updated_id = member.id
         except IntegrityError as exc:
-            await db.rollback()
             if data.email is not None:
                 raise DuplicateEmailException(str(data.email)) from exc
-            raise
-        except Exception:
-            await db.rollback()
             raise
 
         loaded = await MemberRepository.get_by_id(db, updated_id, include_inactive=True)
@@ -216,9 +214,10 @@ class MemberService:
 
         Raises:
             MemberNotFoundException: If the member does not exist or is already inactive.
-            HTTPException: If the member still has active loan(s).
+            ActiveLoansException: If the member still has active loan(s).
         """
-        try:
+        updated_id: UUID
+        async with transaction(db):
             member = await MemberRepository.get_by_id(
                 db,
                 member_id,
@@ -229,17 +228,11 @@ class MemberService:
 
             active_loans = await LendingRepository.get_active_by_member(db, member_id)
             if active_loans:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Cannot delete member with {len(active_loans)} active loan(s)",
-                )
+                raise ActiveLoansException(entity="member", count=len(active_loans))
 
             member = await MemberRepository.soft_delete(db, member, staff_id)
             updated_id = member.id
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
+
         loaded = await MemberRepository.get_by_id(db, updated_id, include_inactive=True)
         member = loaded if loaded is not None else member
         library_api.info("Member soft deleted: %s", member_id)
@@ -260,7 +253,8 @@ class MemberService:
         Raises:
             MemberNotFoundException: If no member exists for the given id.
         """
-        try:
+        updated_id: UUID
+        async with transaction(db):
             member = await MemberRepository.get_by_id(
                 db,
                 member_id,
@@ -271,10 +265,7 @@ class MemberService:
 
             member = await MemberRepository.restore(db, member, staff_id)
             updated_id = member.id
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
+
         loaded = await MemberRepository.get_by_id(db, updated_id, include_inactive=True)
         member = loaded if loaded is not None else member
         library_api.info("Member restored: %s", member_id)

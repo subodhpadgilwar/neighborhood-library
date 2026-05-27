@@ -7,12 +7,18 @@ validation that requires database context live here.
 import math
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import BookNotFoundException, DuplicateISBNException
+from app.core.exceptions import (
+    ActiveLoansException,
+    BookDeactivatedException,
+    BookNotFoundException,
+    DuplicateISBNException,
+    InvalidCopyCountException,
+)
 from app.core.logger import library_api
+from app.core.unit_of_work import transaction
 from app.models.book import Book
 from app.repositories.book_repo import BookRepository
 from app.repositories.lending_repo import LendingRepository
@@ -133,17 +139,14 @@ class BookService:
 
         Raises:
             BookNotFoundException: If no book matches the ISBN.
-            HTTPException: If the book exists but is deactivated.
+            BookDeactivatedException: If the book exists but is deactivated.
         """
         book = await BookRepository.get_by_isbn(db, isbn)
         if book is None:
             raise BookNotFoundException(isbn)
 
         if not book.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This book exists but is currently deactivated",
-            )
+            raise BookDeactivatedException()
 
         library_api.info("Book lookup by ISBN: %s", isbn)
         return book
@@ -163,27 +166,26 @@ class BookService:
         Raises:
             DuplicateISBNException: If the ISBN is already in use.
         """
+        book_id: UUID
         try:
-            if data.isbn is not None:
-                existing = await BookRepository.get_by_isbn(db, data.isbn)
-                if existing is not None:
-                    raise DuplicateISBNException(data.isbn)
+            async with transaction(db):
+                if data.isbn is not None:
+                    existing = await BookRepository.get_by_isbn(db, data.isbn)
+                    if existing is not None:
+                        raise DuplicateISBNException(data.isbn)
 
-            book = await BookRepository.create(db, data)
-            book.created_by = staff_id
-            book_id = book.id
-            await db.commit()
+                book = await BookRepository.create(db, data)
+                book.created_by = staff_id
+                book_id = book.id
         except IntegrityError as exc:
-            await db.rollback()
             if data.isbn is not None:
                 raise DuplicateISBNException(data.isbn) from exc
             raise
-        except Exception:
-            await db.rollback()
-            raise
 
         loaded = await BookRepository.get_by_id(db, book_id, include_inactive=True)
-        book = loaded if loaded is not None else book
+        if loaded is None:
+            raise BookNotFoundException(book_id)
+        book = loaded
         library_api.info("Book created: %s", book.title)
         return book
 
@@ -208,40 +210,32 @@ class BookService:
         Raises:
             BookNotFoundException: If the book does not exist.
             DuplicateISBNException: If the new ISBN belongs to another book.
+            InvalidCopyCountException: If copies_total is below borrowed count.
         """
+        updated_id: UUID
         try:
-            book = await BookRepository.get_by_id_for_update(db, book_id)
-            if book is None:
-                raise BookNotFoundException(book_id)
+            async with transaction(db):
+                book = await BookRepository.get_by_id_for_update(db, book_id)
+                if book is None:
+                    raise BookNotFoundException(book_id)
 
-            if data.isbn is not None:
-                existing = await BookRepository.get_by_isbn(db, data.isbn)
-                if existing is not None and existing.id != book.id:
-                    raise DuplicateISBNException(data.isbn)
+                if data.isbn is not None:
+                    existing = await BookRepository.get_by_isbn(db, data.isbn)
+                    if existing is not None and existing.id != book.id:
+                        raise DuplicateISBNException(data.isbn)
 
-            if data.copies_total is not None:
-                borrowed_count = book.copies_total - book.copies_available
-                if data.copies_total < borrowed_count:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=(
-                            "Total copies cannot be less than currently "
-                            "borrowed copies"
-                        ),
-                    )
-                book.copies_available = data.copies_total - borrowed_count
+                if data.copies_total is not None:
+                    borrowed_count = book.copies_total - book.copies_available
+                    if data.copies_total < borrowed_count:
+                        raise InvalidCopyCountException()
+                    book.copies_available = data.copies_total - borrowed_count
 
-            book.updated_by = staff_id
-            book = await BookRepository.update(db, book, data)
-            updated_id = book.id
-            await db.commit()
+                book.updated_by = staff_id
+                book = await BookRepository.update(db, book, data)
+                updated_id = book.id
         except IntegrityError as exc:
-            await db.rollback()
             if data.isbn is not None:
                 raise DuplicateISBNException(data.isbn) from exc
-            raise
-        except Exception:
-            await db.rollback()
             raise
 
         loaded = await BookRepository.get_by_id(db, updated_id, include_inactive=True)
@@ -263,9 +257,10 @@ class BookService:
 
         Raises:
             BookNotFoundException: If the book does not exist or is already inactive.
-            HTTPException: If the book still has active loan(s).
+            ActiveLoansException: If the book still has active loan(s).
         """
-        try:
+        updated_id: UUID
+        async with transaction(db):
             book = await BookRepository.get_by_id_for_update(
                 db,
                 book_id,
@@ -276,17 +271,11 @@ class BookService:
 
             active_loans = await LendingRepository.get_active_by_book(db, book_id)
             if active_loans:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Cannot delete book with {len(active_loans)} active loan(s)",
-                )
+                raise ActiveLoansException(entity="book", count=len(active_loans))
 
             book = await BookRepository.soft_delete(db, book, staff_id)
             updated_id = book.id
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
+
         loaded = await BookRepository.get_by_id(db, updated_id, include_inactive=True)
         book = loaded if loaded is not None else book
         library_api.info("Book soft deleted: %s by staff %s", book_id, staff_id)
@@ -307,7 +296,8 @@ class BookService:
         Raises:
             BookNotFoundException: If no book exists for the given id.
         """
-        try:
+        updated_id: UUID
+        async with transaction(db):
             book = await BookRepository.get_by_id_for_update(
                 db,
                 book_id,
@@ -318,10 +308,7 @@ class BookService:
 
             book = await BookRepository.restore(db, book, staff_id)
             updated_id = book.id
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
+
         loaded = await BookRepository.get_by_id(db, updated_id, include_inactive=True)
         book = loaded if loaded is not None else book
         library_api.info("Book restored: %s by staff %s", book_id, staff_id)
