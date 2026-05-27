@@ -8,13 +8,9 @@ import { LocationScanner } from "@/components/shared/LocationScanner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { useFormSubmitState } from "@/hooks/useFormSubmitState";
 import { bookService } from "@/services";
 import type { Book, BookCreate, BookUpdate } from "@/types";
-
-type ApiClientError = {
-  status: string;
-  message: string;
-};
 
 interface BookFormModalProps {
   open: boolean;
@@ -63,8 +59,8 @@ export function BookFormModal({
   const isEdit = book != null;
   const [form, setForm] = useState<FormState>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<Partial<FormState>>({});
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, apiError, clearApiError, runSubmit } =
+    useFormSubmitState();
 
   useDeferredEffect(() => {
     if (!open) {
@@ -76,13 +72,13 @@ export function BookFormModal({
         : { ...emptyForm, isbn: initialISBN?.trim() ?? "" },
     );
     setFieldErrors({});
-    setApiError(null);
+    clearApiError();
   }, [open, book, initialISBN]);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
-    setApiError(null);
+    clearApiError();
   }
 
   function validate(): boolean {
@@ -116,10 +112,7 @@ export function BookFormModal({
       copies_total: Number(form.copies_total),
     };
 
-    setIsSubmitting(true);
-    setApiError(null);
-
-    try {
+    const result = await runSubmit(async () => {
       if (isEdit && book) {
         await bookService.update(book.id, payload as BookUpdate);
         toast.success("Book updated");
@@ -131,16 +124,10 @@ export function BookFormModal({
       setFieldErrors({});
       onOpenChange(false);
       onSuccess();
-    } catch (err) {
-      const error = err as ApiClientError;
-      setApiError(
-        typeof error?.message === "string"
-          ? error.message
-          : "Something went wrong. Please try again.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+      return true;
+    }, "Something went wrong. Please try again.");
+
+    if (!result) return;
   }
 
   return (

@@ -16,11 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { useFormSubmitState } from "@/hooks/useFormSubmitState";
 import { isValidEmail, isValidPassword, PASSWORD_HINT } from "@/lib/password";
 import { staffService } from "@/services";
 import type { Staff, StaffCreate, StaffRole, StaffUpdate } from "@/types";
-
-type ApiClientError = { status: string; message: string };
 
 interface StaffFormModalProps {
   isOpen: boolean;
@@ -112,8 +111,8 @@ export function StaffFormModal({
   const isCreate = mode === "create";
   const [form, setForm] = useState<FormState>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<Partial<FormState>>({});
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, apiError, clearApiError, runSubmit } =
+    useFormSubmitState();
 
   useDeferredEffect(() => {
     if (!isOpen) {
@@ -123,8 +122,14 @@ export function StaffFormModal({
       !isCreate && initialData ? staffToForm(initialData) : emptyForm,
     );
     setFieldErrors({});
-    setApiError(null);
+    clearApiError();
   }, [isOpen, isCreate, initialData]);
+
+  function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+    clearApiError();
+  }
 
   function validate(): boolean {
     const errors: Partial<FormState> = {};
@@ -158,10 +163,7 @@ export function StaffFormModal({
       return;
     }
 
-    setIsSubmitting(true);
-    setApiError(null);
-
-    try {
+    const result = await runSubmit(async () => {
       if (isCreate) {
         const payload: StaffCreate = {
           full_name: form.full_name.trim(),
@@ -184,16 +186,10 @@ export function StaffFormModal({
       setFieldErrors({});
       onClose();
       onSuccess();
-    } catch (err) {
-      const error = err as ApiClientError;
-      setApiError(
-        typeof error?.message === "string"
-          ? error.message
-          : "Something went wrong. Please try again.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+      return true;
+    }, "Something went wrong. Please try again.");
+
+    if (!result) return;
   }
 
   return (
@@ -222,9 +218,7 @@ export function StaffFormModal({
             <Input
               id="staff-full-name"
               value={form.full_name}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, full_name: e.target.value }))
-              }
+              onChange={(e) => updateField("full_name", e.target.value)}
               disabled={isSubmitting}
               aria-invalid={Boolean(fieldErrors.full_name)}
             />
@@ -241,9 +235,7 @@ export function StaffFormModal({
               id="staff-email"
               type="email"
               value={form.email}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, email: e.target.value }))
-              }
+              onChange={(e) => updateField("email", e.target.value)}
               disabled={isSubmitting}
               aria-invalid={Boolean(fieldErrors.email)}
             />
@@ -256,9 +248,7 @@ export function StaffFormModal({
             <Label htmlFor="staff-role">Role</Label>
             <Select
               value={form.role}
-              onValueChange={(role) =>
-                setForm((prev) => ({ ...prev, role: role as StaffRole }))
-              }
+              onValueChange={(role) => updateField("role", role as StaffRole)}
               disabled={isSubmitting || initialData?.is_default_admin}
             >
               <SelectTrigger id="staff-role" className="w-full">
@@ -277,9 +267,7 @@ export function StaffFormModal({
                 id="staff-password"
                 label="Password *"
                 value={form.password}
-                onChange={(password) =>
-                  setForm((prev) => ({ ...prev, password }))
-                }
+                onChange={(password) => updateField("password", password)}
                 disabled={isSubmitting}
                 error={fieldErrors.password}
               />
@@ -291,7 +279,7 @@ export function StaffFormModal({
                 label="Confirm Password *"
                 value={form.confirm_password}
                 onChange={(confirm_password) =>
-                  setForm((prev) => ({ ...prev, confirm_password }))
+                  updateField("confirm_password", confirm_password)
                 }
                 disabled={isSubmitting}
                 error={fieldErrors.confirm_password}

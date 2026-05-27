@@ -16,11 +16,10 @@ import {
   isCalendarDayBefore,
 } from "@/lib/dateUtils";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { useFormSubmitState } from "@/hooks/useFormSubmitState";
 import { cn } from "@/lib/utils";
 import { lendingService } from "@/services";
 import type { Lending } from "@/types";
-
-type ApiClientError = { status: string; message: string };
 
 interface UpdateDueDateModalProps {
   isOpen: boolean;
@@ -40,8 +39,8 @@ export function UpdateDueDateModal({
     isoToDateInputValue(lending.due_date),
   );
   const [fieldError, setFieldError] = useState<string | null>(null);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, apiError, clearApiError, runSubmit } =
+    useFormSubmitState();
 
   useDeferredEffect(() => {
     if (!isOpen) {
@@ -49,13 +48,13 @@ export function UpdateDueDateModal({
     }
     setDueDateInput(isoToDateInputValue(lending.due_date));
     setFieldError(null);
-    setApiError(null);
+    clearApiError();
   }, [isOpen, lending]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFieldError(null);
-    setApiError(null);
+    clearApiError();
 
     if (!dueDateInput) {
       setFieldError("Please select a due date.");
@@ -67,8 +66,7 @@ export function UpdateDueDateModal({
       return;
     }
 
-    setIsSubmitting(true);
-    try {
+    const result = await runSubmit(async () => {
       await lendingService.updateDueDate(
         lending.id,
         dateInputToApiIso(dueDateInput),
@@ -76,16 +74,10 @@ export function UpdateDueDateModal({
       toast.success("Due date updated successfully");
       onClose();
       onSuccess();
-    } catch (err) {
-      const error = err as ApiClientError;
-      setApiError(
-        typeof error?.message === "string"
-          ? error.message
-          : "Failed to update due date.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+      return true;
+    }, "Failed to update due date.");
+
+    if (!result) return;
   }
 
   return (
@@ -133,7 +125,7 @@ export function UpdateDueDateModal({
           onChange={(e) => {
             setDueDateInput(e.target.value);
             setFieldError(null);
-            setApiError(null);
+            clearApiError();
           }}
           disabled={isSubmitting}
           className={cn(

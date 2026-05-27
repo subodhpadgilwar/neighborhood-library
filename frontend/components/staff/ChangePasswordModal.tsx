@@ -9,11 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { useFormSubmitState } from "@/hooks/useFormSubmitState";
 import { isValidPassword, PASSWORD_HINT } from "@/lib/password";
 import { staffService } from "@/services";
 import type { Staff } from "@/types";
-
-type ApiClientError = { status: string; message: string };
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -89,8 +88,8 @@ export function ChangePasswordModal({
   const isOwn = mode === "own";
   const [form, setForm] = useState<FormState>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<Partial<FormState>>({});
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, apiError, clearApiError, runSubmit } =
+    useFormSubmitState();
 
   useDeferredEffect(() => {
     if (!isOpen) {
@@ -98,8 +97,14 @@ export function ChangePasswordModal({
     }
     setForm(emptyForm);
     setFieldErrors({});
-    setApiError(null);
+    clearApiError();
   }, [isOpen]);
+
+  function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+    clearApiError();
+  }
 
   function validate(): boolean {
     const errors: Partial<FormState> = {};
@@ -126,10 +131,7 @@ export function ChangePasswordModal({
       return;
     }
 
-    setIsSubmitting(true);
-    setApiError(null);
-
-    try {
+    const result = await runSubmit(async () => {
       if (isOwn) {
         await staffService.changeOwnPassword({
           current_password: form.current_password,
@@ -146,16 +148,10 @@ export function ChangePasswordModal({
       }
       setForm(emptyForm);
       onClose();
-    } catch (err) {
-      const error = err as ApiClientError;
-      setApiError(
-        typeof error?.message === "string"
-          ? error.message
-          : "Failed to change password.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+      return true;
+    }, "Failed to change password.");
+
+    if (!result) return;
   }
 
   return (
@@ -181,7 +177,7 @@ export function ChangePasswordModal({
           label="Current Password *"
           value={form.current_password}
           onChange={(current_password) =>
-            setForm((prev) => ({ ...prev, current_password }))
+            updateField("current_password", current_password)
           }
           disabled={isSubmitting}
           error={fieldErrors.current_password}
@@ -192,9 +188,7 @@ export function ChangePasswordModal({
         id="new-password"
         label="New Password *"
         value={form.new_password}
-        onChange={(new_password) =>
-          setForm((prev) => ({ ...prev, new_password }))
-        }
+        onChange={(new_password) => updateField("new_password", new_password)}
         disabled={isSubmitting}
         error={fieldErrors.new_password}
       />
@@ -205,7 +199,7 @@ export function ChangePasswordModal({
         label="Confirm New Password *"
         value={form.confirm_password}
         onChange={(confirm_password) =>
-          setForm((prev) => ({ ...prev, confirm_password }))
+          updateField("confirm_password", confirm_password)
         }
         disabled={isSubmitting}
         error={fieldErrors.confirm_password}

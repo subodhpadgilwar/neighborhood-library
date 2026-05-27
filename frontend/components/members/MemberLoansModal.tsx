@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 
 import { getLoanStatus } from "@/components/lending/loanUtils";
 import { LoanStatusBadge } from "@/components/lending/LoanStatusBadge";
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@/components/shared/DataTable";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorMessage } from "@/components/shared/ErrorMessage";
 import { Button } from "@/components/ui/button";
@@ -16,14 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatDate } from "@/lib/dateUtils";
 import { memberService } from "@/services";
 import type { Lending, Member } from "@/types";
@@ -83,6 +79,29 @@ export function MemberLoansModal({
     };
   }, [open, member]);
 
+  const columns: DataTableColumn<Lending>[] = [
+    {
+      key: "book_title",
+      header: "Book Title",
+      cell: (loan) => <span className="font-medium">{loan.book_title}</span>,
+    },
+    {
+      key: "borrowed_at",
+      header: "Borrowed Date",
+      cell: (loan) => formatDate(loan.borrowed_at),
+    },
+    {
+      key: "due_date",
+      header: "Due Date",
+      cell: (loan) => formatDate(loan.due_date),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (loan) => <LoanStatusBadge status={getLoanStatus(loan)} />,
+    },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -102,30 +121,11 @@ export function MemberLoansModal({
         ) : loans.length === 0 ? (
           <EmptyState message="No active loans" />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Book Title</TableHead>
-                <TableHead>Borrowed Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loans.map((loan) => (
-                <TableRow key={loan.id}>
-                  <TableCell className="font-medium">
-                    {loan.book_title}
-                  </TableCell>
-                  <TableCell>{formatDate(loan.borrowed_at)}</TableCell>
-                  <TableCell>{formatDate(loan.due_date)}</TableCell>
-                  <TableCell>
-                    <LoanStatusBadge status={getLoanStatus(loan)} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            data={loans}
+            columns={columns}
+            getRowKey={(loan) => loan.id}
+          />
         )}
 
         <DialogFooter>
