@@ -12,15 +12,19 @@ import { StaffTable } from "@/components/staff/StaffTable";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorMessage } from "@/components/shared/ErrorMessage";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
+import { Pagination } from "@/components/shared/Pagination";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery";
 import { useAuth } from "@/lib/authContext";
 import { staffService } from "@/services";
 import type { Staff } from "@/types";
 
 type ApiClientError = { status: string; message: string };
+
+const DEFAULT_PAGE_SIZE = 25;
 
 export default function StaffPage() {
   const { staff: currentStaff } = useAuth();
@@ -29,7 +33,13 @@ export default function StaffPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [totalStaff, setTotalStaff] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+
+  const { page, limit, setPage, setLimit } = usePaginatedQuery({
+    defaultLimit: DEFAULT_PAGE_SIZE,
+  });
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -44,8 +54,16 @@ export default function StaffPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await staffService.getAll(showInactive);
-      setStaffList(data);
+      const data = await staffService.getPage({
+        page,
+        limit,
+        includeInactive: showInactive,
+        sortBy: "full_name",
+        sortOrder: "asc",
+      });
+      setStaffList(data.items);
+      setTotalStaff(data.total);
+      setTotalPages(data.total_pages);
     } catch (err) {
       const apiError = err as ApiClientError;
       setError(
@@ -56,7 +74,7 @@ export default function StaffPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showInactive]);
+  }, [limit, page, showInactive]);
 
   useDeferredEffect(() => {
     void fetchStaff();
@@ -69,6 +87,14 @@ export default function StaffPage() {
     setIsDeactivateModalOpen(false);
     setSelectedStaff(null);
     void fetchStaff();
+  }
+
+  function handlePageChange(nextPage: number) {
+    setPage(nextPage);
+  }
+
+  function handleLimitChange(nextLimit: number) {
+    setLimit(nextLimit);
   }
 
   function handleEdit(staff: Staff) {
@@ -152,14 +178,27 @@ export default function StaffPage() {
             onAction={() => setIsCreateModalOpen(true)}
           />
         ) : (
-          <StaffTable
-            staff={staffList}
-            currentStaff={currentStaffRecord}
-            onEdit={handleEdit}
-            onChangePassword={handleChangePassword}
-            onDeactivate={handleDeactivate}
-            onRestore={handleRestore}
-          />
+          <div className="space-y-4">
+            <StaffTable
+              staff={staffList}
+              currentStaff={currentStaffRecord}
+              onEdit={handleEdit}
+              onChangePassword={handleChangePassword}
+              onDeactivate={handleDeactivate}
+              onRestore={handleRestore}
+            />
+
+            {totalStaff > 0 ? (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={totalStaff}
+                itemsPerPage={limit}
+                onPageChange={handlePageChange}
+                onLimitChange={handleLimitChange}
+              />
+            ) : null}
+          </div>
         )}
       </div>
 

@@ -1,11 +1,8 @@
-import axios from "axios";
+import { isAxiosError } from "axios";
 
 import { api } from "@/lib/api";
 import { apiPaths } from "@/lib/apiPaths";
 import type { Book, BookCreate, BookListResponse, BookUpdate } from "@/types";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 interface BookPageParams {
   page?: number;
@@ -56,12 +53,10 @@ export async function getById(id: string): Promise<Book> {
 
 export async function getByISBN(isbn: string): Promise<Book> {
   try {
-    const { data } = await axios.get<Book>(
-      `${API_BASE_URL}/api/v1${apiPaths.books.byISBN(isbn)}`,
-    );
+    const { data } = await api.get<Book>(apiPaths.books.byISBN(isbn));
     return data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
+    if (isAxiosError(error)) {
       if (error.response?.status === 404) {
         throw {
           status: "not_found",

@@ -1,10 +1,12 @@
 import { api } from "@/lib/api";
 import { apiPaths } from "@/lib/apiPaths";
 import type {
+  ActiveLoansResponse,
   BorrowRequest,
   Lending,
   LendingFilters,
   LendingHistoryResponse,
+  OverdueLoansResponse,
 } from "@/types";
 
 function buildHistoryQueryParams(
@@ -26,10 +28,16 @@ function buildHistoryQueryParams(
     params.book_title = filters.book_title.trim();
   }
   if (filters.borrowed_from) {
-    params.borrowed_from = filters.borrowed_from;
+    const d = new Date(filters.borrowed_from);
+    if (!isNaN(d.getTime())) {
+      params.borrowed_from = d.toISOString();
+    }
   }
   if (filters.borrowed_to) {
-    params.borrowed_to = filters.borrowed_to;
+    const d = new Date(filters.borrowed_to);
+    if (!isNaN(d.getTime())) {
+      params.borrowed_to = d.toISOString();
+    }
   }
   if (filters.sort_by) {
     params.sort_by = filters.sort_by;
@@ -48,12 +56,36 @@ function buildHistoryQueryParams(
 }
 
 export async function getAllActive(): Promise<Lending[]> {
-  const { data } = await api.get<Lending[]>(apiPaths.lending.list);
-  return data;
+  const { data } = await api.get<ActiveLoansResponse>(apiPaths.lending.list, {
+    params: { skip: 0, limit: 50 },
+  });
+  return data.items;
 }
 
 export async function getOverdue(): Promise<Lending[]> {
-  const { data } = await api.get<Lending[]>(apiPaths.lending.overdue);
+  const { data } = await api.get<OverdueLoansResponse>(apiPaths.lending.overdue, {
+    params: { skip: 0, limit: 50 },
+  });
+  return data.items;
+}
+
+export async function getActivePage(params: {
+  skip: number;
+  limit: number;
+}): Promise<ActiveLoansResponse> {
+  const { data } = await api.get<ActiveLoansResponse>(apiPaths.lending.list, {
+    params,
+  });
+  return data;
+}
+
+export async function getOverduePage(params: {
+  skip: number;
+  limit: number;
+}): Promise<OverdueLoansResponse> {
+  const { data } = await api.get<OverdueLoansResponse>(apiPaths.lending.overdue, {
+    params,
+  });
   return data;
 }
 

@@ -5,12 +5,32 @@ import type {
   ChangePasswordRequest,
   Staff,
   StaffCreate,
+  StaffListResponse,
   StaffUpdate,
 } from "@/types";
 
 export async function getAll(includeInactive = false): Promise<Staff[]> {
-  const { data } = await api.get<Staff[]>(apiPaths.staff.list, {
-    params: { include_inactive: includeInactive },
+  const { data } = await api.get<StaffListResponse>(apiPaths.staff.list, {
+    params: { page: 1, limit: 10_000, include_inactive: includeInactive },
+  });
+  return data.items;
+}
+
+export async function getPage(params: {
+  page: number;
+  limit: number;
+  includeInactive?: boolean;
+  sortBy?: "full_name" | "email" | "created_at";
+  sortOrder?: "asc" | "desc";
+}): Promise<StaffListResponse> {
+  const { data } = await api.get<StaffListResponse>(apiPaths.staff.list, {
+    params: {
+      page: params.page,
+      limit: params.limit,
+      include_inactive: params.includeInactive ?? false,
+      sort_by: params.sortBy ?? "full_name",
+      sort_order: params.sortOrder ?? "asc",
+    },
   });
   return data;
 }

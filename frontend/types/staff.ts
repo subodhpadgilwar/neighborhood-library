@@ -34,3 +34,5 @@ export interface AdminChangePasswordRequest {
   new_password: string;
   confirm_password: string;
 }
+
+export type StaffListResponse = import("./common").PaginatedResponse<Staff>;

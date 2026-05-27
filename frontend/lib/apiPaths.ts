@@ -16,7 +16,7 @@ export const apiPaths = {
     restore: (id: string) => `/members/${id}/restore`,
   },
   staff: {
-    list: "/staff",
+    list: "/staff/",
     byId: (id: string) => `/staff/${id}`,
     restore: (id: string) => `/staff/${id}/restore`,
     changeOwnPassword: "/staff/me/change-password",

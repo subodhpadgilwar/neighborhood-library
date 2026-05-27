@@ -18,8 +18,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery";
 import { lendingService } from "@/services";
-import type { Lending, LendingFilters as LendingFiltersState, LendingHistoryResponse } from "@/types";
+import type {
+  Lending,
+  LendingFilters as LendingFiltersState,
+  LendingHistoryResponse,
+  ActiveLoansResponse,
+  OverdueLoansResponse,
+} from "@/types";
 
 const DEFAULT_HISTORY_FILTERS: LendingFiltersState = {
   sort_by: "borrowed_at",
@@ -42,8 +49,8 @@ function LendingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeLoans, setActiveLoans] = useState<Lending[]>([]);
-  const [overdueLoans, setOverdueLoans] = useState<Lending[]>([]);
+  const [activeData, setActiveData] = useState<ActiveLoansResponse | null>(null);
+  const [overdueData, setOverdueData] = useState<OverdueLoansResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
@@ -63,16 +70,25 @@ function LendingPageContent() {
     searchParams.get("tab") === "history",
   );
 
+  const activePagination = usePaginatedQuery({ defaultLimit: 50 });
+  const overduePagination = usePaginatedQuery({ defaultLimit: 50 });
+
   const loadLoans = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const [active, overdue] = await Promise.all([
-        lendingService.getAllActive(),
-        lendingService.getOverdue(),
+        lendingService.getActivePage({
+          skip: activePagination.skip,
+          limit: activePagination.limit,
+        }),
+        lendingService.getOverduePage({
+          skip: overduePagination.skip,
+          limit: overduePagination.limit,
+        }),
       ]);
-      setActiveLoans(active);
-      setOverdueLoans(overdue);
+      setActiveData(active);
+      setOverdueData(overdue);
     } catch (err) {
       const apiError = err as { message?: string };
       setError(
@@ -80,10 +96,12 @@ function LendingPageContent() {
           ? apiError.message
           : "Failed to load loans.",
       );
+      setActiveData(null);
+      setOverdueData(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activePagination.limit, activePagination.skip, overduePagination.limit, overduePagination.skip]);
 
   const fetchHistory = useCallback(async () => {
     setIsHistoryLoading(true);
@@ -135,9 +153,32 @@ function LendingPageContent() {
     void fetchHistory();
   }, [historyTabOpened, fetchHistory]);
 
-  const overdueCount = overdueLoans.length;
+  const overdueCount = overdueData?.total ?? 0;
   const historyPage = historyData?.page ?? 1;
   const historyTotalPages = historyData?.total_pages ?? 0;
+
+  const activeTotalPages = activeData
+    ? Math.ceil(activeData.total / activeData.limit)
+    : 0;
+  const overdueTotalPages = overdueData
+    ? Math.ceil(overdueData.total / overdueData.limit)
+    : 0;
+
+  function handleActivePageChange(page: number) {
+    activePagination.setPage(page);
+  }
+
+  function handleActiveLimitChange(limit: number) {
+    activePagination.setLimit(limit);
+  }
+
+  function handleOverduePageChange(page: number) {
+    overduePagination.setPage(page);
+  }
+
+  function handleOverdueLimitChange(limit: number) {
+    overduePagination.setLimit(limit);
+  }
 
   function handleEditDueDate(lending: Lending) {
     setSelectedLending(lending);
@@ -227,11 +268,23 @@ function LendingPageContent() {
             {isLoading ? (
               <LoadingSkeleton rows={5} columns={7} />
             ) : (
-              <ActiveLoansTable
-                loans={activeLoans}
-                onReturn={() => void loadLoans()}
-                onEditDueDate={handleEditDueDate}
-              />
+              <div className="space-y-4">
+                <ActiveLoansTable
+                  loans={activeData?.items ?? []}
+                  onReturn={() => void loadLoans()}
+                  onEditDueDate={handleEditDueDate}
+                />
+                {activeData && activeData.total > 0 ? (
+                  <Pagination
+                    currentPage={activePagination.page}
+                    totalPages={activeTotalPages}
+                    totalItems={activeData.total}
+                    itemsPerPage={activePagination.limit}
+                    onPageChange={handleActivePageChange}
+                    onLimitChange={handleActiveLimitChange}
+                  />
+                ) : null}
+              </div>
             )}
           </TabsContent>
 
@@ -239,7 +292,19 @@ function LendingPageContent() {
             {isLoading ? (
               <LoadingSkeleton rows={5} columns={7} />
             ) : (
-              <OverdueTable loans={overdueLoans} />
+              <div className="space-y-4">
+                <OverdueTable loans={overdueData?.items ?? []} />
+                {overdueData && overdueData.total > 0 ? (
+                  <Pagination
+                    currentPage={overduePagination.page}
+                    totalPages={overdueTotalPages}
+                    totalItems={overdueData.total}
+                    itemsPerPage={overduePagination.limit}
+                    onPageChange={handleOverduePageChange}
+                    onLimitChange={handleOverdueLimitChange}
+                  />
+                ) : null}
+              </div>
             )}
           </TabsContent>
 

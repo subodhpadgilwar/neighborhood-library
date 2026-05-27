@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery";
 import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { bookService } from "@/services";
 import type { Book } from "@/types";
@@ -40,8 +41,9 @@ function BooksPageContent() {
   const debouncedSearch = useDebouncedValue(searchInput);
   const [sortDirection, setSortDirection] =
     useState<TitleSortDirection>("asc");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+  const { page, limit, setPage, setLimit } = usePaginatedQuery({
+    defaultLimit: DEFAULT_PAGE_SIZE,
+  });
   const [totalBooks, setTotalBooks] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
@@ -151,7 +153,6 @@ function BooksPageContent() {
 
   function handleLimitChange(nextLimit: number) {
     setLimit(nextLimit);
-    setPage(1);
   }
 
   function handleDeactivate(book: Book) {

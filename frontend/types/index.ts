@@ -18,12 +18,15 @@ export type {
   BorrowRequest,
   UpdateDueDateRequest,
   LendingFilters,
+  ActiveLoansResponse,
+  OverdueLoansResponse,
   LendingHistoryResponse,
 } from "./lending";
 
 export type {
   Staff,
   StaffCreate,
+  StaffListResponse,
   StaffRole,
   StaffUpdate,
   ChangePasswordRequest,

@@ -1,25 +1,12 @@
 "use client";
 
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Filter,
-} from "lucide-react";
+import { Filter } from "lucide-react";
 import { differenceInCalendarDays, parseISO, startOfDay } from "date-fns";
 
 import { formatLoanDate, getLoanStatus } from "@/components/lending/loanUtils";
 import { LoanStatusBadge } from "@/components/lending/LoanStatusBadge";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { daysOverdue, daysUntilDue } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 import type { Lending, LendingFilters } from "@/types";
@@ -103,56 +90,6 @@ function DaysInfo({ lending }: { lending: Lending }) {
   );
 }
 
-function SortableHeader({
-  label,
-  column,
-  sortBy,
-  sortOrder,
-  onSortChange,
-}: {
-  label: string;
-  column: SortableColumn;
-  sortBy?: LendingFilters["sort_by"];
-  sortOrder?: LendingFilters["sort_order"];
-  onSortChange: LendingHistoryTableProps["onSortChange"];
-}) {
-  const isActive = sortBy === column;
-
-  function handleClick() {
-    if (isActive) {
-      onSortChange(column, sortOrder === "asc" ? "desc" : "asc");
-      return;
-    }
-    onSortChange(column, "desc");
-  }
-
-  return (
-    <TableHead>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="-ml-3 h-8 gap-1 font-medium"
-        onClick={handleClick}
-      >
-        {label}
-        {isActive ? (
-          sortOrder === "asc" ? (
-            <ArrowUp className="size-3.5" aria-hidden />
-          ) : (
-            <ArrowDown className="size-3.5" aria-hidden />
-          )
-        ) : (
-          <ArrowUpDown
-            className="size-3.5 text-muted-foreground"
-            aria-hidden
-          />
-        )}
-      </Button>
-    </TableHead>
-  );
-}
-
 function getRowClassName(lending: Lending): string {
   if (lending.returned_at) {
     return "bg-muted/40 text-muted-foreground";
@@ -184,82 +121,86 @@ export function LendingHistoryTable({
     );
   }
 
+  const columns: DataTableColumn<Lending>[] = [
+    {
+      key: "book_title",
+      header: "Book Title",
+      sortKey: "book_title",
+      cell: (lending) => (
+        <span className="font-medium">{lending.book_title}</span>
+      ),
+    },
+    {
+      key: "book_author",
+      header: "Author",
+      cell: (lending) => lending.book_author,
+    },
+    {
+      key: "member_name",
+      header: "Member Name",
+      sortKey: "member_name",
+      cell: (lending) => lending.member_name,
+    },
+    {
+      key: "member_email",
+      header: "Member Email",
+      cell: (lending) => (
+        <span className="text-muted-foreground">{lending.member_email}</span>
+      ),
+    },
+    {
+      key: "borrowed_at",
+      header: "Borrowed Date",
+      sortKey: "borrowed_at",
+      cell: (lending) => formatLoanDate(lending.borrowed_at),
+    },
+    {
+      key: "due_date",
+      header: "Due Date",
+      sortKey: "due_date",
+      cell: (lending) => formatLoanDate(lending.due_date),
+    },
+    {
+      key: "returned_at",
+      header: "Returned Date",
+      sortKey: "returned_at",
+      cell: (lending) =>
+        lending.returned_at ? formatLoanDate(lending.returned_at) : "—",
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (lending) => <HistoryStatusBadge lending={lending} />,
+    },
+    {
+      key: "days_info",
+      header: "Days Info",
+      cell: (lending) => <DaysInfo lending={lending} />,
+    },
+    {
+      key: "processed_by",
+      header: "Processed By",
+      cell: (lending) => (
+        <span className="text-muted-foreground">
+          {lending.processed_by ?? "—"}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-2">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <SortableHeader
-              label="Book Title"
-              column="book_title"
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSortChange={onSortChange}
-            />
-            <TableHead>Author</TableHead>
-            <SortableHeader
-              label="Member Name"
-              column="member_name"
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSortChange={onSortChange}
-            />
-            <TableHead>Member Email</TableHead>
-            <SortableHeader
-              label="Borrowed Date"
-              column="borrowed_at"
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSortChange={onSortChange}
-            />
-            <SortableHeader
-              label="Due Date"
-              column="due_date"
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSortChange={onSortChange}
-            />
-            <SortableHeader
-              label="Returned Date"
-              column="returned_at"
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSortChange={onSortChange}
-            />
-            <TableHead>Status</TableHead>
-            <TableHead>Days Info</TableHead>
-            <TableHead>Processed By</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((lending) => (
-            <TableRow key={lending.id} className={cn(getRowClassName(lending))}>
-              <TableCell className="font-medium">{lending.book_title}</TableCell>
-              <TableCell>{lending.book_author}</TableCell>
-              <TableCell>{lending.member_name}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {lending.member_email}
-              </TableCell>
-              <TableCell>{formatLoanDate(lending.borrowed_at)}</TableCell>
-              <TableCell>{formatLoanDate(lending.due_date)}</TableCell>
-              <TableCell>
-                {lending.returned_at
-                  ? formatLoanDate(lending.returned_at)
-                  : "—"}
-              </TableCell>
-              <TableCell>
-                <HistoryStatusBadge lending={lending} />
-              </TableCell>
-              <TableCell>
-                <DaysInfo lending={lending} />
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {lending.processed_by ?? "—"}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <DataTable
+      data={items}
+      columns={columns}
+      getRowKey={(lending) => lending.id}
+      getRowClassName={(lending) => cn(getRowClassName(lending))}
+      sort={{
+        sortBy: sortBy ?? undefined,
+        sortOrder: sortOrder ?? undefined,
+        onSortChange: (nextSortBy, nextSortOrder) => {
+          onSortChange(nextSortBy as SortableColumn, nextSortOrder);
+        },
+      }}
+    />
   );
 }

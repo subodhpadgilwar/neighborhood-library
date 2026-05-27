@@ -10,9 +10,11 @@ from app.models.staff import Staff
 from app.schemas.book import BookListResponse, BookResponse
 from app.schemas.lending import LendingHistoryResponse, LendingResponse
 from app.schemas.member import MemberListResponse, MemberResponse
+from app.schemas.staff import StaffListResponse, StaffResponse
 from app.services.book_service import BookService
 from app.services.lending_service import LendingService
 from app.services.member_service import MemberService
+from app.services.staff_service import StaffService
 
 
 async def override_db():
@@ -77,6 +79,21 @@ def make_lending_response(**overrides) -> LendingResponse:
     return LendingResponse.model_validate(data)
 
 
+def make_staff_response(**overrides) -> StaffResponse:
+    data = {
+        "id": uuid4(),
+        "email": "admin@example.com",
+        "full_name": "Admin User",
+        "role": "admin",
+        "is_active": True,
+        "is_default_admin": True,
+        "created_at": now_utc(),
+        "updated_at": now_utc(),
+    }
+    data.update(overrides)
+    return StaffResponse.model_validate(data)
+
+
 def clear_overrides() -> None:
     app.dependency_overrides.clear()
 
@@ -125,6 +142,52 @@ def test_list_books_forwards_pagination_and_search(monkeypatch) -> None:
         "sort_by": "author",
         "sort_order": "desc",
         "include_inactive": True,
+    }
+
+
+def test_list_staff_forwards_pagination_and_sort(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def get_page(_db, **kwargs):
+        captured.update(kwargs)
+        staff = make_staff_response(full_name="Jane Admin", email="jane@example.com")
+        return StaffListResponse(
+            items=[staff],
+            total=1,
+            page=3,
+            limit=25,
+            total_pages=7,
+        )
+
+    monkeypatch.setattr(StaffService, "get_page", get_page)
+    app.dependency_overrides[get_db] = override_db
+    admin_staff = make_staff()
+    admin_staff.role = "admin"
+    admin_staff.is_default_admin = True
+    app.dependency_overrides[get_current_staff] = lambda: admin_staff
+
+    try:
+        response = TestClient(app).get(
+            "/api/v1/staff/",
+            params={
+                "page": 3,
+                "limit": 25,
+                "include_inactive": True,
+                "sort_by": "email",
+                "sort_order": "desc",
+            },
+        )
+    finally:
+        clear_overrides()
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["email"] == "jane@example.com"
+    assert captured == {
+        "page": 3,
+        "limit": 25,
+        "include_inactive": True,
+        "sort_by": "email",
+        "sort_order": "desc",
     }
 
 

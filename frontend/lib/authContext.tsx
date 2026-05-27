@@ -11,13 +11,8 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import {
-  getToken,
-  removeStoredStaff,
-  removeToken,
-  setStoredStaff,
-  setToken,
-} from "@/lib/auth";
+import { removeStoredStaff, setStoredStaff } from "@/lib/auth";
+import { NEXT_AUTH_ROUTES } from "@/lib/apiConfig";
 import { authService } from "@/services";
 import type { StaffResponse } from "@/types";
 
@@ -26,7 +21,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -41,15 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function loadSession() {
-      const token = getToken();
-      if (!token) {
-        if (!cancelled) {
-          setStaff(null);
-          setIsLoading(false);
-        }
-        return;
-      }
-
       try {
         const me = await authService.getMe();
         if (!cancelled) {
@@ -58,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         if (!cancelled) {
-          removeToken();
           removeStoredStaff();
           setStaff(null);
         }
@@ -83,15 +68,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoading, staff, pathname, router]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { access_token } = await authService.login(email, password);
-    setToken(access_token);
+    const res = await fetch(NEXT_AUTH_ROUTES.login, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        typeof err.message === "string" ? err.message : "Login failed",
+      );
+    }
     const me = await authService.getMe();
     setStaff(me);
     setStoredStaff(me);
   }, []);
 
-  const logout = useCallback(() => {
-    removeToken();
+  const logout = useCallback(async () => {
+    await fetch(NEXT_AUTH_ROUTES.logout, { method: "POST" }).catch(() => {});
     removeStoredStaff();
     setStaff(null);
     router.push("/login");

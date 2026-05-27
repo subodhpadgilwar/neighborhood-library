@@ -1,19 +1,11 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { formatLoanDate } from "@/components/lending/loanUtils";
+import { FormDialog } from "@/components/shared/FormDialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -97,100 +89,67 @@ export function UpdateDueDateModal({
   }
 
   return (
-    <Dialog
+    <FormDialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) {
-          onClose();
-        }
+        if (!open) onClose();
       }}
+      title="Update Due Date"
+      description="Adjust when this loan must be returned."
+      submitLabel="Update Due Date"
+      isSubmitting={isSubmitting}
+      apiError={apiError}
+      onSubmit={handleSubmit}
+      className="sm:max-w-md"
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Update Due Date</DialogTitle>
-          <DialogDescription>
-            Adjust when this loan must be returned.
-          </DialogDescription>
-        </DialogHeader>
+      <div className="space-y-1 rounded-lg bg-muted/50 p-3 text-sm">
+        <p>
+          <span className="text-muted-foreground">Book:</span>{" "}
+          {lending.book_title}
+        </p>
+        <p>
+          <span className="text-muted-foreground">Member:</span>{" "}
+          {lending.member_name}
+        </p>
+        <p>
+          <span className="text-muted-foreground">Borrowed:</span>{" "}
+          {formatLoanDate(lending.borrowed_at)}
+        </p>
+        <p>
+          <span className="text-muted-foreground">Current Due:</span>{" "}
+          {formatLoanDate(lending.due_date)}
+        </p>
+      </div>
 
-        <div className="space-y-1 rounded-lg bg-muted/50 p-3 text-sm">
-          <p>
-            <span className="text-muted-foreground">Book:</span>{" "}
-            {lending.book_title}
-          </p>
-          <p>
-            <span className="text-muted-foreground">Member:</span>{" "}
-            {lending.member_name}
-          </p>
-          <p>
-            <span className="text-muted-foreground">Borrowed:</span>{" "}
-            {formatLoanDate(lending.borrowed_at)}
-          </p>
-          <p>
-            <span className="text-muted-foreground">Current Due:</span>{" "}
-            {formatLoanDate(lending.due_date)}
-          </p>
-        </div>
+      <Separator />
 
-        <Separator />
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="new-due-date">New Due Date</Label>
-            <Input
-              id="new-due-date"
-              type="date"
-              min={borrowDateInput}
-              value={dueDateInput}
-              onChange={(e) => {
-                setDueDateInput(e.target.value);
-                setFieldError(null);
-                setApiError(null);
-              }}
-              disabled={isSubmitting}
-              className={cn(
-                "w-full",
-                "[&::-webkit-calendar-picker-indicator]:cursor-pointer",
-              )}
-              aria-invalid={Boolean(fieldError)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Due date must be on or after the borrow date (
-              {formatDate(lending.borrowed_at)}).
-            </p>
-            {fieldError ? (
-              <p className="text-xs text-destructive">{fieldError}</p>
-            ) : null}
-          </div>
-
-          {apiError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {apiError}
-            </p>
-          ) : null}
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Update Due Date"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <div className="space-y-2">
+        <Label htmlFor="new-due-date">New Due Date</Label>
+        <Input
+          id="new-due-date"
+          type="date"
+          min={borrowDateInput}
+          value={dueDateInput}
+          onChange={(e) => {
+            setDueDateInput(e.target.value);
+            setFieldError(null);
+            setApiError(null);
+          }}
+          disabled={isSubmitting}
+          className={cn(
+            "w-full",
+            "[&::-webkit-calendar-picker-indicator]:cursor-pointer",
+          )}
+          aria-invalid={Boolean(fieldError)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Due date must be on or after the borrow date (
+          {formatDate(lending.borrowed_at)}).
+        </p>
+        {fieldError ? (
+          <p className="text-xs text-destructive">{fieldError}</p>
+        ) : null}
+      </div>
+    </FormDialog>
   );
 }

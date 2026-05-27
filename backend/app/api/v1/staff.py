@@ -5,7 +5,7 @@ All routes protected by JWT authentication unless noted otherwise.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_staff, get_db, require_admin
@@ -14,6 +14,7 @@ from app.schemas.staff import (
     AdminChangePasswordRequest,
     ChangePasswordRequest,
     StaffCreate,
+    StaffListResponse,
     StaffResponse,
     StaffUpdate,
 )
@@ -22,15 +23,25 @@ from app.services.staff_service import StaffService
 router = APIRouter(prefix="/staff", tags=["Staff"])
 
 
-@router.get("/", response_model=list[StaffResponse])
+@router.get("/", response_model=StaffListResponse)
 async def list_staff(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(require_admin),
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
     include_inactive: bool = False,
-) -> list[StaffResponse]:
-    """List staff accounts with optional inclusion of deactivated users."""
-    staff_list = await StaffService.get_all(db, include_inactive=include_inactive)
-    return [StaffResponse.model_validate(staff) for staff in staff_list]
+    sort_by: str = Query("full_name", pattern="^(full_name|email|created_at)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
+) -> StaffListResponse:
+    """List staff accounts with server-side pagination."""
+    return await StaffService.get_page(
+        db,
+        page=page,
+        limit=limit,
+        include_inactive=include_inactive,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
 
 @router.post("/", response_model=StaffResponse, status_code=status.HTTP_201_CREATED)

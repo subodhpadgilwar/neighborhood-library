@@ -4,6 +4,7 @@ Orchestrates between repository layer and API layer. All business rules and
 validation that requires database context live here.
 """
 
+import math
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -18,6 +19,8 @@ from app.schemas.staff import (
     AdminChangePasswordRequest,
     ChangePasswordRequest,
     StaffCreate,
+    StaffListResponse,
+    StaffResponse,
     StaffUpdate,
 )
 
@@ -39,7 +42,40 @@ class StaffService:
         Returns:
             List of Staff models.
         """
-        return await StaffRepository.get_all(db, include_inactive=include_inactive)
+        return await StaffRepository.get_all(
+            db,
+            skip=0,
+            limit=10_000,
+            include_inactive=include_inactive,
+        )
+
+    @staticmethod
+    async def get_page(
+        db: AsyncSession,
+        page: int = 1,
+        limit: int = 100,
+        include_inactive: bool = False,
+        sort_by: str = "full_name",
+        sort_order: str = "asc",
+    ) -> StaffListResponse:
+        """Return a paginated staff list response."""
+        skip = (page - 1) * limit
+        staff_list = await StaffRepository.get_all(
+            db,
+            skip=skip,
+            limit=limit,
+            include_inactive=include_inactive,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+        total = await StaffRepository.count(db, include_inactive=include_inactive)
+        return StaffListResponse(
+            items=[StaffResponse.model_validate(staff) for staff in staff_list],
+            total=total,
+            page=page,
+            limit=limit,
+            total_pages=math.ceil(total / limit) if limit > 0 else 0,
+        )
 
     @staticmethod
     async def get_by_id(

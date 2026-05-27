@@ -1,31 +1,21 @@
 import axios, { type AxiosError } from "axios";
-
-import { removeToken } from "@/lib/auth";
 import type { ApiError } from "@/types";
+import { PROXY_BASE_PATH } from "@/lib/apiConfig";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
+/**
+ * All API calls go through the Next.js proxy route at /api/proxy/*.
+ * The proxy attaches the HttpOnly cookie token as a Bearer header.
+ * No token or backend URL is ever exposed to client-side JavaScript.
+ */
 export const api = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
+  baseURL: PROXY_BASE_PATH,
   headers: { "Content-Type": "application/json" },
-});
-
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("library_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
 });
 
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      removeToken();
       window.location.href = "/login";
     }
 

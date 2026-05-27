@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -44,29 +44,67 @@ class StaffRepository:
         return stmt
 
     @staticmethod
+    def _apply_sort(
+        stmt: Select[tuple[Staff]],
+        sort_by: str,
+        sort_order: str,
+    ) -> Select[tuple[Staff]]:
+        """Apply a safe sort expression for staff lists."""
+        columns = {
+            "full_name": Staff.full_name,
+            "email": Staff.email,
+            "created_at": Staff.created_at,
+        }
+        sort_column = columns.get(sort_by, Staff.full_name)
+        if sort_order == "desc":
+            return stmt.order_by(sort_column.desc())
+        return stmt.order_by(sort_column.asc())
+
+    @staticmethod
     async def get_all(
         db: AsyncSession,
+        skip: int = 0,
+        limit: int = 100,
         include_inactive: bool = False,
+        sort_by: str = "full_name",
+        sort_order: str = "asc",
     ) -> list[Staff]:
-        """Fetch all staff records.
+        """Fetch a paginated list of staff records.
 
         Args:
             db: Async database session.
+            skip: Number of rows to skip for pagination.
+            limit: Maximum number of rows to return.
             include_inactive: When False (default), deactivated staff are excluded.
+            sort_by: Column key to sort by.
+            sort_order: ``asc`` or ``desc``.
 
         Returns:
             List of Staff ORM instances.
         """
         library_api.debug(
-            "StaffRepository.get_all include_inactive=%s",
+            "StaffRepository.get_all skip=%s limit=%s include_inactive=%s",
+            skip,
+            limit,
             include_inactive,
         )
         stmt = StaffRepository._apply_active_filter(
             StaffRepository._select_staff(),
             include_inactive,
         )
-        result = await db.execute(stmt)
+        stmt = StaffRepository._apply_sort(stmt, sort_by, sort_order)
+        result = await db.execute(stmt.offset(skip).limit(limit))
         return list(result.scalars().all())
+
+    @staticmethod
+    async def count(
+        db: AsyncSession,
+        include_inactive: bool = False,
+    ) -> int:
+        """Count staff matching the same filters used by ``get_all``."""
+        stmt = StaffRepository._apply_active_filter(select(Staff), include_inactive).subquery()
+        result = await db.execute(select(func.count()).select_from(stmt))
+        return int(result.scalar_one())
 
     @staticmethod
     async def get_by_id(

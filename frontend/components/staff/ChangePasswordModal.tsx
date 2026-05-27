@@ -1,18 +1,11 @@
 "use client";
 
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { FormDialog } from "@/components/shared/FormDialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
@@ -166,89 +159,57 @@ export function ChangePasswordModal({
   }
 
   return (
-    <Dialog
+    <FormDialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) {
-          onClose();
-        }
+        if (!open) onClose();
       }}
+      title="Change Password"
+      description={
+        isOwn
+          ? "Enter your current password and choose a new one."
+          : `You are changing the password for ${targetStaff?.full_name ?? "this staff member"}.`
+      }
+      submitLabel="Update Password"
+      isSubmitting={isSubmitting}
+      apiError={apiError}
+      onSubmit={handleSubmit}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Change Password</DialogTitle>
-          <DialogDescription>
-            {isOwn
-              ? "Enter your current password and choose a new one."
-              : `You are changing the password for ${targetStaff?.full_name ?? "this staff member"}.`}
-          </DialogDescription>
-        </DialogHeader>
+      {isOwn ? (
+        <PasswordInput
+          id="current-password"
+          label="Current Password *"
+          value={form.current_password}
+          onChange={(current_password) =>
+            setForm((prev) => ({ ...prev, current_password }))
+          }
+          disabled={isSubmitting}
+          error={fieldErrors.current_password}
+        />
+      ) : null}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isOwn ? (
-            <PasswordInput
-              id="current-password"
-              label="Current Password *"
-              value={form.current_password}
-              onChange={(current_password) =>
-                setForm((prev) => ({ ...prev, current_password }))
-              }
-              disabled={isSubmitting}
-              error={fieldErrors.current_password}
-            />
-          ) : null}
+      <PasswordInput
+        id="new-password"
+        label="New Password *"
+        value={form.new_password}
+        onChange={(new_password) =>
+          setForm((prev) => ({ ...prev, new_password }))
+        }
+        disabled={isSubmitting}
+        error={fieldErrors.new_password}
+      />
+      <p className="-mt-2 text-xs text-muted-foreground">{PASSWORD_HINT}</p>
 
-          <PasswordInput
-            id="new-password"
-            label="New Password *"
-            value={form.new_password}
-            onChange={(new_password) =>
-              setForm((prev) => ({ ...prev, new_password }))
-            }
-            disabled={isSubmitting}
-            error={fieldErrors.new_password}
-          />
-          <p className="-mt-2 text-xs text-muted-foreground">{PASSWORD_HINT}</p>
-
-          <PasswordInput
-            id="confirm-new-password"
-            label="Confirm New Password *"
-            value={form.confirm_password}
-            onChange={(confirm_password) =>
-              setForm((prev) => ({ ...prev, confirm_password }))
-            }
-            disabled={isSubmitting}
-            error={fieldErrors.confirm_password}
-          />
-
-          {apiError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {apiError}
-            </p>
-          ) : null}
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Update Password"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <PasswordInput
+        id="confirm-new-password"
+        label="Confirm New Password *"
+        value={form.confirm_password}
+        onChange={(confirm_password) =>
+          setForm((prev) => ({ ...prev, confirm_password }))
+        }
+        disabled={isSubmitting}
+        error={fieldErrors.confirm_password}
+      />
+    </FormDialog>
   );
 }

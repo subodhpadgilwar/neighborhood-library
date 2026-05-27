@@ -25,7 +25,9 @@ export interface LendingFilters {
   status?: "active" | "returned" | "overdue";
   member_name?: string;
   book_title?: string;
+  /** ISO 8601 string or any value parseable by `new Date()` */
   borrowed_from?: string;
+  /** ISO 8601 string or any value parseable by `new Date()` */
   borrowed_to?: string;
   sort_by?:
     | "borrowed_at"
@@ -44,4 +46,18 @@ export interface LendingHistoryResponse {
   page: number;
   limit: number;
   total_pages: number;
+}
+
+export interface ActiveLoansResponse {
+  items: Lending[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface OverdueLoansResponse {
+  items: Lending[];
+  total: number;
+  skip: number;
+  limit: number;
 }

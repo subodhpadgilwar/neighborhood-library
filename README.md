@@ -169,10 +169,10 @@ Stops in ~5 seconds, starts in ~30 seconds.
 For local development (without Docker), create `frontend/.env.local`:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
+INTERNAL_API_URL=http://localhost:8000
 ```
 
-When using Docker Compose, the frontend image is built with `NEXT_PUBLIC_API_URL=http://localhost:8000` so the browser can reach the API on the host-mapped port.
+`INTERNAL_API_URL` is used only by Next.js server-side code (route handlers, middleware, server components) to reach the FastAPI backend. Client-side code always calls the Next.js proxy at `/api/proxy/*`.
 
 ## Manual Setup (Without Docker)
 

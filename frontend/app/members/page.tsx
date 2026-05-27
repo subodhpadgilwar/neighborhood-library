@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery";
 import { memberService } from "@/services";
 import type { Member } from "@/types";
 
@@ -34,8 +35,9 @@ function MembersPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput);
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+  const { page, limit, setPage, setLimit } = usePaginatedQuery({
+    defaultLimit: DEFAULT_PAGE_SIZE,
+  });
   const [totalMembers, setTotalMembers] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -97,7 +99,6 @@ function MembersPageContent() {
 
   function handleLimitChange(nextLimit: number) {
     setLimit(nextLimit);
-    setPage(1);
   }
 
   function openCreateModal() {
