@@ -1,16 +1,18 @@
-"""Custom HTTP exceptions for the library API.
+"""Domain exceptions independent from HTTP framework concerns.
 
-Using custom exception classes instead of raw HTTPException provides:
-
-- Consistent error messages across the codebase
-- A single place to update error messages
-- Self-documenting code (``BookNotFoundException`` is clearer than HTTPException(404))
-- Easier testing and mocking in services
+These errors are raised by services/dependencies to express business failures.
+The API layer maps them to HTTP status codes and response payloads.
 """
 
-from fastapi import HTTPException, status
 
-_BEARER_AUTH_HEADERS = {"WWW-Authenticate": "Bearer"}
+class DomainException(Exception):
+    """Base class for domain/application errors."""
+
+    default_message = "A domain error occurred"
+
+    def __init__(self, message: str | None = None) -> None:
+        self.message = message or self.default_message
+        super().__init__(self.message)
 
 
 # ---------------------------------------------------------------------------
@@ -18,17 +20,17 @@ _BEARER_AUTH_HEADERS = {"WWW-Authenticate": "Bearer"}
 # ---------------------------------------------------------------------------
 
 
-class BookNotFoundException(HTTPException):
+class BookNotFoundException(DomainException):
     """Raised when a book ID does not exist or is not found in the database."""
 
     def __init__(self, book_id: int | str | None = None) -> None:
         detail = (
             f"Book not found: {book_id}" if book_id is not None else "Book not found"
         )
-        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+        super().__init__(detail)
 
 
-class MemberNotFoundException(HTTPException):
+class MemberNotFoundException(DomainException):
     """Raised when a member ID does not exist or is not found in the database."""
 
     def __init__(self, member_id: int | str | None = None) -> None:
@@ -37,27 +39,21 @@ class MemberNotFoundException(HTTPException):
             if member_id is not None
             else "Member not found"
         )
-        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+        super().__init__(detail)
 
 
-class LendingNotFoundException(HTTPException):
+class LendingNotFoundException(DomainException):
     """Raised when a lending record ID does not exist in the database."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lending record not found",
-        )
+        super().__init__("Lending record not found")
 
 
-class StaffNotFoundException(HTTPException):
+class StaffNotFoundException(DomainException):
     """Raised when a staff ID does not exist or is not found in the database."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Staff member not found",
-        )
+        super().__init__("Staff member not found")
 
 
 # ---------------------------------------------------------------------------
@@ -65,141 +61,102 @@ class StaffNotFoundException(HTTPException):
 # ---------------------------------------------------------------------------
 
 
-class BookNotAvailableException(HTTPException):
+class BookNotAvailableException(DomainException):
     """Raised when a borrow is attempted but no copies of the book are available."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No copies available for this book",
-        )
+        super().__init__("No copies available for this book")
 
 
-class AlreadyBorrowedException(HTTPException):
+class AlreadyBorrowedException(DomainException):
     """Raised when a member already has an active loan for the same book."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Member already has this book borrowed",
-        )
+        super().__init__("Member already has this book borrowed")
 
 
-class AlreadyReturnedException(HTTPException):
+class AlreadyReturnedException(DomainException):
     """Raised when a return is attempted on a loan that is already returned."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This book has already been returned",
-        )
+        super().__init__("This book has already been returned")
 
 
-class BookDeactivatedException(HTTPException):
+class BookDeactivatedException(DomainException):
     """Raised when lookup targets a soft-deleted book."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This book exists but is currently deactivated",
-        )
+        super().__init__("This book exists but is currently deactivated")
 
 
-class InvalidCopyCountException(HTTPException):
+class InvalidCopyCountException(DomainException):
     """Raised when total copies would fall below currently borrowed copies."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Total copies cannot be less than currently borrowed copies",
-        )
+        super().__init__("Total copies cannot be less than currently borrowed copies")
 
 
-class ActiveLoansException(HTTPException):
+class ActiveLoansException(DomainException):
     """Raised when deleting an entity that still has open loans."""
 
     def __init__(self, *, entity: str, count: int) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete {entity} with {count} active loan(s)",
-        )
+        super().__init__(f"Cannot delete {entity} with {count} active loan(s)")
 
 
-class InvalidDueDateException(HTTPException):
+class InvalidDueDateException(DomainException):
     """Raised when a due date is missing, in the past, or not after borrow time."""
 
     def __init__(self, detail: str) -> None:
-        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+        super().__init__(detail)
 
 
-class CannotUpdateReturnedLoanException(HTTPException):
+class CannotUpdateReturnedLoanException(DomainException):
     """Raised when updating due date on a closed loan."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update due date of returned book",
-        )
+        super().__init__("Cannot update due date of returned book")
 
 
-class IncorrectPasswordException(HTTPException):
+class IncorrectPasswordException(DomainException):
     """Raised when the supplied current password does not match."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect",
-        )
+        super().__init__("Current password is incorrect")
 
 
-class PasswordUnchangedException(HTTPException):
+class PasswordUnchangedException(DomainException):
     """Raised when the new password matches the current password."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must differ from current",
-        )
+        super().__init__("New password must differ from current")
 
 
-class CannotChangeDefaultAdminRoleException(HTTPException):
+class CannotChangeDefaultAdminRoleException(DomainException):
     """Raised when attempting to change the default admin's role."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot change the default admin role",
-        )
+        super().__init__("Cannot change the default admin role")
 
 
-class CannotChangeOwnRoleException(HTTPException):
+class CannotChangeOwnRoleException(DomainException):
     """Raised when staff attempt to change their own role."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot change your own role",
-        )
+        super().__init__("Cannot change your own role")
 
 
-class CannotDeactivateDefaultAdminException(HTTPException):
+class CannotDeactivateDefaultAdminException(DomainException):
     """Raised when attempting to deactivate the default admin account."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot deactivate the default admin",
-        )
+        super().__init__("Cannot deactivate the default admin")
 
 
-class CannotDeactivateSelfException(HTTPException):
+class CannotDeactivateSelfException(DomainException):
     """Raised when staff attempt to deactivate their own account."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot deactivate your own account",
-        )
+        super().__init__("Cannot deactivate your own account")
 
 
 # ---------------------------------------------------------------------------
@@ -207,24 +164,18 @@ class CannotDeactivateSelfException(HTTPException):
 # ---------------------------------------------------------------------------
 
 
-class DuplicateEmailException(HTTPException):
+class DuplicateEmailException(DomainException):
     """Raised when creating or updating a record with an email that already exists."""
 
     def __init__(self, email: str) -> None:
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Email already registered: {email}",
-        )
+        super().__init__(f"Email already registered: {email}")
 
 
-class DuplicateISBNException(HTTPException):
+class DuplicateISBNException(DomainException):
     """Raised when creating or updating a book with an ISBN that already exists."""
 
     def __init__(self, isbn: str) -> None:
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"A book with this ISBN already exists: {isbn}",
-        )
+        super().__init__(f"A book with this ISBN already exists: {isbn}")
 
 
 # ---------------------------------------------------------------------------
@@ -232,26 +183,25 @@ class DuplicateISBNException(HTTPException):
 # ---------------------------------------------------------------------------
 
 
-class InvalidCredentialsException(HTTPException):
+class InvalidCredentialsException(DomainException):
     """Raised when login email or password does not match any staff account."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers=_BEARER_AUTH_HEADERS,
-        )
+        super().__init__("Invalid email or password")
 
 
-class InvalidTokenException(HTTPException):
+class InvalidTokenException(DomainException):
     """Raised when a JWT is missing, invalid, or expired."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token is invalid or expired",
-            headers=_BEARER_AUTH_HEADERS,
-        )
+        super().__init__("Token is invalid or expired")
+
+
+class AuthenticationRequiredException(DomainException):
+    """Raised when an endpoint requires authentication for a requested option."""
+
+    def __init__(self, message: str = "Authentication is required") -> None:
+        super().__init__(message)
 
 
 # ---------------------------------------------------------------------------
@@ -259,11 +209,8 @@ class InvalidTokenException(HTTPException):
 # ---------------------------------------------------------------------------
 
 
-class AdminRequiredException(HTTPException):
+class AdminRequiredException(DomainException):
     """Raised when a staff account lacks permission for an admin-only action."""
 
     def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges are required for this action",
-        )
+        super().__init__("Admin privileges are required for this action")

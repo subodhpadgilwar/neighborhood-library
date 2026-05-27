@@ -16,8 +16,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
+from app.api.error_mapping import map_domain_exception
 from app.api.v1.router import api_router
 from app.config import settings
+from app.core.exceptions import DomainException
 from app.core.logger import library_api
 from app.core.seeder import seed_default_admin, seed_sample_books
 from app.database import AsyncSessionLocal
@@ -207,6 +209,27 @@ async def http_exception_handler(
             "status": "error",
             "message": _http_exception_message(exc.detail),
         },
+    )
+
+
+@app.exception_handler(DomainException)
+async def domain_exception_handler(
+    request: Request,
+    exc: DomainException,
+) -> JSONResponse:
+    """Convert domain exceptions into HTTP responses via the API mapping layer."""
+    status_code, message, headers = map_domain_exception(exc)
+    library_api.warning(
+        "Domain error mapped to HTTP %s for %s %s: %s",
+        status_code,
+        request.method,
+        request.url.path,
+        message,
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "error", "message": message},
+        headers=headers or None,
     )
 
 

@@ -5,10 +5,11 @@ All routes protected by JWT authentication unless noted otherwise.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_staff, get_db, get_optional_staff
+from app.core.exceptions import AuthenticationRequiredException
 from app.models.staff import Staff
 from app.schemas.book import BookCreate, BookListResponse, BookResponse, BookUpdate
 from app.services.book_service import BookService
@@ -30,9 +31,8 @@ async def list_books(
 ) -> BookListResponse:
     """List catalog books with server-side pagination and filtering (no JWT)."""
     if include_inactive and current_staff is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required to view inactive books",
+        raise AuthenticationRequiredException(
+            "Authentication required to view inactive books",
         )
     return await BookService.get_page(
         db,
