@@ -1,9 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 
+import { pageLimitToSkip } from "@/lib/pagination";
+
 export interface PaginationState {
   page: number;
   limit: number;
 }
+
+export { pageLimitToSkip };
 
 /**
  * Shared pagination state helper for list views.
@@ -16,7 +20,7 @@ export function usePaginatedQuery(options?: {
   const [page, setPage] = useState(options?.defaultPage ?? 1);
   const [limit, setLimit] = useState(options?.defaultLimit ?? 10);
 
-  const skip = useMemo(() => (page - 1) * limit, [page, limit]);
+  const skip = useMemo(() => pageLimitToSkip(page, limit), [page, limit]);
 
   const setLimitAndResetPage = useCallback((nextLimit: number) => {
     setLimit(nextLimit);

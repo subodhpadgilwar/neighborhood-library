@@ -1,3 +1,4 @@
+import { pageLimitToSkip } from "@/lib/pagination";
 import { api } from "@/lib/api";
 import { apiPaths } from "@/lib/apiPaths";
 import type {
@@ -45,10 +46,10 @@ function buildHistoryQueryParams(
   if (filters.sort_order) {
     params.sort_order = filters.sort_order;
   }
-  if (filters.skip !== undefined) {
-    params.skip = filters.skip;
-  }
-  if (filters.limit !== undefined) {
+  if (filters.page !== undefined && filters.limit !== undefined) {
+    params.skip = pageLimitToSkip(filters.page, filters.limit);
+    params.limit = filters.limit;
+  } else if (filters.limit !== undefined) {
     params.limit = filters.limit;
   }
 
@@ -70,21 +71,27 @@ export async function getOverdue(): Promise<Lending[]> {
 }
 
 export async function getActivePage(params: {
-  skip: number;
+  page: number;
   limit: number;
 }): Promise<ActiveLoansResponse> {
   const { data } = await api.get<ActiveLoansResponse>(apiPaths.lending.list, {
-    params,
+    params: {
+      skip: pageLimitToSkip(params.page, params.limit),
+      limit: params.limit,
+    },
   });
   return data;
 }
 
 export async function getOverduePage(params: {
-  skip: number;
+  page: number;
   limit: number;
 }): Promise<OverdueLoansResponse> {
   const { data } = await api.get<OverdueLoansResponse>(apiPaths.lending.overdue, {
-    params,
+    params: {
+      skip: pageLimitToSkip(params.page, params.limit),
+      limit: params.limit,
+    },
   });
   return data;
 }

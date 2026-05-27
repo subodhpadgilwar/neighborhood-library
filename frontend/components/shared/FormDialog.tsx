@@ -21,6 +21,9 @@ interface FormDialogProps {
   children: ReactNode;
   submitLabel: string;
   isSubmitting: boolean;
+  /** Disables submit while prerequisites load (e.g. select options). */
+  isSubmitDisabled?: boolean;
+  fieldError?: string | null;
   apiError?: string | null;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   className?: string;
@@ -34,6 +37,8 @@ export function FormDialog({
   children,
   submitLabel,
   isSubmitting,
+  isSubmitDisabled = false,
+  fieldError,
   apiError,
   onSubmit,
   className = "sm:max-w-md",
@@ -48,6 +53,10 @@ export function FormDialog({
 
         <form onSubmit={onSubmit} className="space-y-4">
           {children}
+
+          {fieldError ? (
+            <p className="text-sm text-destructive">{fieldError}</p>
+          ) : null}
 
           {apiError ? (
             <p role="alert" className="text-sm text-destructive">
@@ -64,7 +73,7 @@ export function FormDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || isSubmitDisabled}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="animate-spin" />

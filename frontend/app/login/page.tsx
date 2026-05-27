@@ -161,10 +161,6 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
-
-      <p className="mt-6 max-w-sm text-center text-xs text-muted-foreground/80">
-        Default: admin@library.com / Admin@123
-      </p>
     </main>
   );
 }

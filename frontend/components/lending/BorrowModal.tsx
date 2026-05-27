@@ -8,15 +8,8 @@ import { toast } from "sonner";
 import { formatLoanDate } from "@/components/lending/loanUtils";
 import { SearchableSelect } from "@/components/lending/SearchableSelect";
 import { BarcodeScanner } from "@/components/shared/BarcodeScanner";
+import { FormDialog } from "@/components/shared/FormDialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,6 +20,7 @@ import {
   isCalendarDayBefore,
 } from "@/lib/dateUtils";
 import { useDeferredEffect } from "@/hooks/useDeferredEffect";
+import { useFormSubmitState } from "@/hooks/useFormSubmitState";
 import { normalizeISBNFromScan } from "@/lib/isbnUtils";
 import { cn } from "@/lib/utils";
 import { bookService, lendingService, memberService } from "@/services";
@@ -54,9 +48,9 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
   const [dueDateInput, setDueDateInput] = useState("");
   const [dueDateError, setDueDateError] = useState<string | null>(null);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const { isSubmitting, apiError, clearApiError, setApiError, runSubmit } =
+    useFormSubmitState();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scannedISBN, setScannedISBN] = useState<string | null>(null);
@@ -98,8 +92,8 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
     setSelectedBook(null);
     setDueDateInput("");
     setDueDateError(null);
-    setApiError(null);
     setFieldError(null);
+    clearApiError();
     setIsScannerOpen(false);
     setScanStatus("idle");
     setScannedISBN(null);
@@ -135,7 +129,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, clearApiError, setApiError]);
 
   function clearScanStatus() {
     setScanStatus("idle");
@@ -195,7 +189,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFieldError(null);
-    setApiError(null);
+    clearApiError();
 
     if (!selectedMember || !selectedBook) {
       setFieldError("Please select both a member and a book.");
@@ -206,8 +200,7 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
       return;
     }
 
-    setIsSubmitting(true);
-    try {
+    const result = await runSubmit(async () => {
       const lending = await lendingService.borrowBook({
         member_id: selectedMember.id,
         book_id: selectedBook.id,
@@ -223,230 +216,197 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
       clearScanStatus();
       onOpenChange(false);
       onSuccess();
-    } catch (err) {
-      const error = err as ApiClientError;
-      setApiError(
-        typeof error?.message === "string"
-          ? error.message
-          : "Failed to borrow book.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+      return true;
+    }, "Failed to borrow book.");
+
+    if (!result) return;
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Borrow Book</DialogTitle>
-          <DialogDescription>
-            Select a member and an available book to create a loan.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Member</Label>
-            <SearchableSelect
-              items={activeMembers}
-              value={selectedMember}
-              onChange={setSelectedMember}
-              getKey={(m) => m.id}
-              getSearchText={(m) => `${m.name} ${m.email}`}
-              placeholder="Select member…"
-              searchPlaceholder="Search members…"
-              disabled={isLoadingOptions || isSubmitting}
-              emptyMessage="No members found."
-              renderValue={(m) => (
-                <span>
-                  {m.name}{" "}
-                  <span className="text-muted-foreground">({m.email})</span>
+    <>
+      <FormDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Borrow Book"
+        description="Select a member and an available book to create a loan."
+        submitLabel="Borrow Book"
+        isSubmitting={isSubmitting}
+        isSubmitDisabled={isLoadingOptions}
+        fieldError={fieldError}
+        apiError={apiError}
+        onSubmit={handleSubmit}
+        className="sm:max-w-md"
+      >
+        <div className="space-y-2">
+          <Label>Member</Label>
+          <SearchableSelect
+            items={activeMembers}
+            value={selectedMember}
+            onChange={setSelectedMember}
+            getKey={(m) => m.id}
+            getSearchText={(m) => `${m.name} ${m.email}`}
+            placeholder="Select member…"
+            searchPlaceholder="Search members…"
+            disabled={isLoadingOptions || isSubmitting}
+            emptyMessage="No members found."
+            renderValue={(m) => (
+              <span>
+                {m.name}{" "}
+                <span className="text-muted-foreground">({m.email})</span>
+              </span>
+            )}
+            renderItem={(m) => (
+              <span>
+                <span className="font-medium">{m.name}</span>
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  {m.email}
                 </span>
-              )}
-              renderItem={(m) => (
-                <span>
-                  <span className="font-medium">{m.name}</span>
-                  <br />
-                  <span className="text-xs text-muted-foreground">
-                    {m.email}
-                  </span>
-                </span>
-              )}
-            />
-          </div>
+              </span>
+            )}
+          />
+        </div>
 
-          <div className="space-y-2">
-            <Label>Book</Label>
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <SearchableSelect
-                  items={bookSelectItems}
-                  value={selectedBook}
-                  onChange={handleBookChange}
-                  getKey={(b) => b.id}
-                  getSearchText={(b) => `${b.title} ${b.author} ${b.isbn ?? ""}`}
-                  placeholder="Select book…"
-                  searchPlaceholder="Search books…"
-                  disabled={isLoadingOptions || isSubmitting}
-                  emptyMessage="No available books."
-                  renderValue={(b) => (
-                    <span>
-                      {b.title}{" "}
-                      <span className="text-muted-foreground">
-                        by {b.author}
-                      </span>
-                    </span>
-                  )}
-                  renderItem={(b) => (
-                    <span>
-                      <span className="font-medium">{b.title}</span>
-                      <br />
-                      <span className="text-xs text-muted-foreground">
-                        {b.author} · {b.copies_available} copies left
-                      </span>
-                    </span>
-                  )}
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="shrink-0 gap-1.5"
-                onClick={() => setIsScannerOpen(true)}
+        <div className="space-y-2">
+          <Label>Book</Label>
+          <div className="flex gap-2">
+            <div className="min-w-0 flex-1">
+              <SearchableSelect
+                items={bookSelectItems}
+                value={selectedBook}
+                onChange={handleBookChange}
+                getKey={(b) => b.id}
+                getSearchText={(b) => `${b.title} ${b.author} ${b.isbn ?? ""}`}
+                placeholder="Select book…"
+                searchPlaceholder="Search books…"
                 disabled={isLoadingOptions || isSubmitting}
-                title="Scan book barcode or QR code"
-              >
-                <Camera className="size-4" aria-hidden />
-                Scan
-              </Button>
-            </div>
-
-            {scanStatus === "scanning" ? (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                Looking up book…
-              </p>
-            ) : null}
-
-            {scanStatus === "found" && scannedBook && scannedISBN ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-                <p className="flex items-start gap-2 font-medium">
-                  <Check className="mt-0.5 size-4 shrink-0" aria-hidden />
+                emptyMessage="No available books."
+                renderValue={(b) => (
                   <span>
-                    Book found: &ldquo;{scannedBook.title}&rdquo; by{" "}
-                    {scannedBook.author}
+                    {b.title}{" "}
+                    <span className="text-muted-foreground">
+                      by {b.author}
+                    </span>
                   </span>
-                </p>
-                <p className="mt-1 pl-6 text-xs opacity-90">
-                  ISBN: {scannedISBN} · {scannedBook.copies_available} copies
-                  available
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 pl-6 text-xs underline underline-offset-2"
-                  onClick={() => setIsScannerOpen(true)}
-                >
-                  Scan Again
-                </button>
-              </div>
-            ) : null}
-
-            {scanStatus === "not_found" && scannedISBN ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-                <p className="flex items-start gap-2 font-medium">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span>No book found with ISBN {scannedISBN}</span>
-                </p>
-                <p className="mt-1 pl-6 text-xs opacity-90">
-                  Please add this book first or select manually
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 pl-6 text-xs underline underline-offset-2"
-                  onClick={() => setIsScannerOpen(true)}
-                >
-                  Scan Again
-                </button>
-              </div>
-            ) : null}
-
-            {scanStatus === "error" ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                <p className="flex items-start gap-2 font-medium">
-                  <X className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span>{scanErrorMessage ?? "Failed to look up book."}</span>
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 pl-6 text-xs underline underline-offset-2"
-                  onClick={() => setIsScannerOpen(true)}
-                >
-                  Scan Again
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="borrow-due-date">Due Date (optional)</Label>
-            <Input
-              id="borrow-due-date"
-              type="date"
-              min={todayInput}
-              value={dueDateInput}
-              onChange={(e) => {
-                setDueDateInput(e.target.value);
-                setDueDateError(null);
-                setApiError(null);
-              }}
-              disabled={isSubmitting}
-              className={cn(
-                "w-full",
-                "[&::-webkit-calendar-picker-indicator]:cursor-pointer",
-              )}
-              aria-invalid={Boolean(dueDateError)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Leave empty to use default 14-day period (due: {defaultDueDateLabel}
-              )
-            </p>
-            {dueDateError ? (
-              <p className="text-xs text-destructive">{dueDateError}</p>
-            ) : null}
-          </div>
-
-          {fieldError ? (
-            <p className="text-sm text-destructive">{fieldError}</p>
-          ) : null}
-          {apiError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {apiError}
-            </p>
-          ) : null}
-
-          <DialogFooter className="pt-2">
+                )}
+                renderItem={(b) => (
+                  <span>
+                    <span className="font-medium">{b.title}</span>
+                    <br />
+                    <span className="text-xs text-muted-foreground">
+                      {b.author} · {b.copies_available} copies left
+                    </span>
+                  </span>
+                )}
+              />
+            </div>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
+              className="shrink-0 gap-1.5"
+              onClick={() => setIsScannerOpen(true)}
+              disabled={isLoadingOptions || isSubmitting}
+              title="Scan book barcode or QR code"
             >
-              Cancel
+              <Camera className="size-4" aria-hidden />
+              Scan
             </Button>
-            <Button type="submit" disabled={isSubmitting || isLoadingOptions}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Borrow Book"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+          </div>
+
+          {scanStatus === "scanning" ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              Looking up book…
+            </p>
+          ) : null}
+
+          {scanStatus === "found" && scannedBook && scannedISBN ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+              <p className="flex items-start gap-2 font-medium">
+                <Check className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>
+                  Book found: &ldquo;{scannedBook.title}&rdquo; by{" "}
+                  {scannedBook.author}
+                </span>
+              </p>
+              <p className="mt-1 pl-6 text-xs opacity-90">
+                ISBN: {scannedISBN} · {scannedBook.copies_available} copies
+                available
+              </p>
+              <button
+                type="button"
+                className="mt-2 pl-6 text-xs underline underline-offset-2"
+                onClick={() => setIsScannerOpen(true)}
+              >
+                Scan Again
+              </button>
+            </div>
+          ) : null}
+
+          {scanStatus === "not_found" && scannedISBN ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+              <p className="flex items-start gap-2 font-medium">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>No book found with ISBN {scannedISBN}</span>
+              </p>
+              <p className="mt-1 pl-6 text-xs opacity-90">
+                Please add this book first or select manually
+              </p>
+              <button
+                type="button"
+                className="mt-2 pl-6 text-xs underline underline-offset-2"
+                onClick={() => setIsScannerOpen(true)}
+              >
+                Scan Again
+              </button>
+            </div>
+          ) : null}
+
+          {scanStatus === "error" ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p className="flex items-start gap-2 font-medium">
+                <X className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>{scanErrorMessage ?? "Failed to look up book."}</span>
+              </p>
+              <button
+                type="button"
+                className="mt-2 pl-6 text-xs underline underline-offset-2"
+                onClick={() => setIsScannerOpen(true)}
+              >
+                Scan Again
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="borrow-due-date">Due Date (optional)</Label>
+          <Input
+            id="borrow-due-date"
+            type="date"
+            min={todayInput}
+            value={dueDateInput}
+            onChange={(e) => {
+              setDueDateInput(e.target.value);
+              setDueDateError(null);
+              clearApiError();
+            }}
+            disabled={isSubmitting}
+            className={cn(
+              "w-full",
+              "[&::-webkit-calendar-picker-indicator]:cursor-pointer",
+            )}
+            aria-invalid={Boolean(dueDateError)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Leave empty to use default 14-day period (due: {defaultDueDateLabel}
+            )
+          </p>
+          {dueDateError ? (
+            <p className="text-xs text-destructive">{dueDateError}</p>
+          ) : null}
+        </div>
+      </FormDialog>
 
       <BarcodeScanner
         isOpen={isScannerOpen}
@@ -454,6 +414,6 @@ export function BorrowModal({ open, onOpenChange, onSuccess }: BorrowModalProps)
         onScan={handleScan}
         title="Scan Book Barcode"
       />
-    </Dialog>
+    </>
   );
 }

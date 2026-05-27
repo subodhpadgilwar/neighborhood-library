@@ -16,7 +16,10 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      window.location.href = "/login";
+      const onLoginPage = window.location.pathname.startsWith("/login");
+      if (!onLoginPage) {
+        window.location.href = "/login";
+      }
     }
 
     const data = error.response?.data;

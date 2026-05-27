@@ -31,7 +31,7 @@ import type {
 const DEFAULT_HISTORY_FILTERS: LendingFiltersState = {
   sort_by: "borrowed_at",
   sort_order: "desc",
-  skip: 0,
+  page: 1,
   limit: 25,
 };
 
@@ -70,8 +70,18 @@ function LendingPageContent() {
     searchParams.get("tab") === "history",
   );
 
-  const activePagination = usePaginatedQuery({ defaultLimit: 50 });
-  const overduePagination = usePaginatedQuery({ defaultLimit: 50 });
+  const {
+    page: activePage,
+    limit: activeLimit,
+    setPage: setActivePage,
+    setLimit: setActiveLimit,
+  } = usePaginatedQuery({ defaultLimit: 50 });
+  const {
+    page: overduePage,
+    limit: overdueLimit,
+    setPage: setOverduePage,
+    setLimit: setOverdueLimit,
+  } = usePaginatedQuery({ defaultLimit: 50 });
 
   const loadLoans = useCallback(async () => {
     setIsLoading(true);
@@ -79,12 +89,12 @@ function LendingPageContent() {
     try {
       const [active, overdue] = await Promise.all([
         lendingService.getActivePage({
-          skip: activePagination.skip,
-          limit: activePagination.limit,
+          page: activePage,
+          limit: activeLimit,
         }),
         lendingService.getOverduePage({
-          skip: overduePagination.skip,
-          limit: overduePagination.limit,
+          page: overduePage,
+          limit: overdueLimit,
         }),
       ]);
       setActiveData(active);
@@ -101,7 +111,7 @@ function LendingPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [activePagination.limit, activePagination.skip, overduePagination.limit, overduePagination.skip]);
+  }, [activeLimit, activePage, overdueLimit, overduePage]);
 
   const fetchHistory = useCallback(async () => {
     setIsHistoryLoading(true);
@@ -154,31 +164,16 @@ function LendingPageContent() {
   }, [historyTabOpened, fetchHistory]);
 
   const overdueCount = overdueData?.total ?? 0;
-  const historyPage = historyData?.page ?? 1;
+  const historyPage = historyFilters.page ?? 1;
+  const historyLimit = historyFilters.limit ?? 25;
   const historyTotalPages = historyData?.total_pages ?? 0;
 
   const activeTotalPages = activeData
-    ? Math.ceil(activeData.total / activeData.limit)
+    ? Math.ceil(activeData.total / activeLimit)
     : 0;
   const overdueTotalPages = overdueData
-    ? Math.ceil(overdueData.total / overdueData.limit)
+    ? Math.ceil(overdueData.total / overdueLimit)
     : 0;
-
-  function handleActivePageChange(page: number) {
-    activePagination.setPage(page);
-  }
-
-  function handleActiveLimitChange(limit: number) {
-    activePagination.setLimit(limit);
-  }
-
-  function handleOverduePageChange(page: number) {
-    overduePagination.setPage(page);
-  }
-
-  function handleOverdueLimitChange(limit: number) {
-    overduePagination.setLimit(limit);
-  }
 
   function handleEditDueDate(lending: Lending) {
     setSelectedLending(lending);
@@ -197,22 +192,22 @@ function LendingPageContent() {
   function handleFilterChange(newFilters: LendingFiltersState) {
     setHistoryFilters({
       ...newFilters,
-      skip: 0,
+      page: 1,
     });
   }
 
-  function handlePageChange(page: number) {
+  function handleHistoryPageChange(page: number) {
     setHistoryFilters((prev) => ({
       ...prev,
-      skip: (page - 1) * (prev.limit ?? 25),
+      page,
     }));
   }
 
-  function handleLimitChange(limit: number) {
+  function handleHistoryLimitChange(limit: number) {
     setHistoryFilters((prev) => ({
       ...prev,
       limit,
-      skip: 0,
+      page: 1,
     }));
   }
 
@@ -224,7 +219,7 @@ function LendingPageContent() {
       ...prev,
       sort_by: sortBy,
       sort_order: sortOrder,
-      skip: 0,
+      page: 1,
     }));
   }
 
@@ -276,12 +271,12 @@ function LendingPageContent() {
                 />
                 {activeData && activeData.total > 0 ? (
                   <Pagination
-                    currentPage={activePagination.page}
+                    currentPage={activePage}
                     totalPages={activeTotalPages}
                     totalItems={activeData.total}
-                    itemsPerPage={activePagination.limit}
-                    onPageChange={handleActivePageChange}
-                    onLimitChange={handleActiveLimitChange}
+                    itemsPerPage={activeLimit}
+                    onPageChange={setActivePage}
+                    onLimitChange={setActiveLimit}
                   />
                 ) : null}
               </div>
@@ -296,12 +291,12 @@ function LendingPageContent() {
                 <OverdueTable loans={overdueData?.items ?? []} />
                 {overdueData && overdueData.total > 0 ? (
                   <Pagination
-                    currentPage={overduePagination.page}
+                    currentPage={overduePage}
                     totalPages={overdueTotalPages}
                     totalItems={overdueData.total}
-                    itemsPerPage={overduePagination.limit}
-                    onPageChange={handleOverduePageChange}
-                    onLimitChange={handleOverdueLimitChange}
+                    itemsPerPage={overdueLimit}
+                    onPageChange={setOverduePage}
+                    onLimitChange={setOverdueLimit}
                   />
                 ) : null}
               </div>
@@ -356,9 +351,9 @@ function LendingPageContent() {
                         currentPage={historyPage}
                         totalPages={historyTotalPages}
                         totalItems={historyData.total}
-                        itemsPerPage={historyData.limit}
-                        onPageChange={handlePageChange}
-                        onLimitChange={handleLimitChange}
+                        itemsPerPage={historyLimit}
+                        onPageChange={handleHistoryPageChange}
+                        onLimitChange={handleHistoryLimitChange}
                       />
                     ) : null}
                   </>

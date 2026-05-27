@@ -36,7 +36,7 @@ export interface LendingFilters {
     | "book_title"
     | "returned_at";
   sort_order?: "asc" | "desc";
-  skip?: number;
+  page?: number;
   limit?: number;
 }
 
