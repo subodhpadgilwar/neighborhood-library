@@ -8,6 +8,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import AlreadyBorrowedException, BookNotAvailableException
 from app.core.security import hash_password
 from app.models.book import Book
 from app.models.member import Member
@@ -127,10 +128,7 @@ async def test_admin_route_requires_admin_role(
     assert allowed.json()["email"] == "new-staff@example.com"
 
 
-async def test_borrow_rejects_duplicate_active_loan(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
+async def test_borrow_rejects_duplicate_active_loan(db_session: AsyncSession) -> None:
     admin = await _seed_admin(db_session)
 
     book = Book(

@@ -159,6 +159,25 @@ class MemberRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_id_for_update(
+        db: AsyncSession,
+        member_id: UUID,
+        include_inactive: bool = False,
+    ) -> Member | None:
+        """Fetch a member row with a write lock for delete-safety checks."""
+        library_api.debug(
+            "MemberRepository.get_by_id_for_update member_id=%s include_inactive=%s",
+            member_id,
+            include_inactive,
+        )
+        stmt = MemberRepository._apply_active_filter(
+            MemberRepository._select_members().where(Member.id == member_id),
+            include_inactive,
+        ).with_for_update()
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_by_email(db: AsyncSession, email: str) -> Member | None:
         """Fetch a member by email without active/inactive filtering.
 

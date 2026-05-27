@@ -86,6 +86,8 @@ class LendingService:
         lending_id: UUID
         try:
             async with transaction(db):
+                # Serialize inventory decrements; partial unique index on active
+                # (book_id, member_id) backs up duplicate-loan detection under concurrency.
                 book = await BookRepository.get_by_id_for_update(db, book_id)
                 if book is None:
                     raise BookNotFoundException(book_id)
@@ -160,6 +162,7 @@ class LendingService:
 
             lending = await LendingRepository.mark_returned(db, lending, staff_id)
 
+            # Lock book inventory row when restoring available copies.
             book = await BookRepository.get_by_id_for_update(
                 db,
                 lending.book_id,

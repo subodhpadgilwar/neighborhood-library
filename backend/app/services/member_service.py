@@ -218,7 +218,8 @@ class MemberService:
         """
         updated_id: UUID
         async with transaction(db):
-            member = await MemberRepository.get_by_id(
+            # Lock member row so active-loan check and soft-delete are atomic.
+            member = await MemberRepository.get_by_id_for_update(
                 db,
                 member_id,
                 include_inactive=False,

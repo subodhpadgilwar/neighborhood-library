@@ -22,14 +22,22 @@ from app.database import Base, get_db
 from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_TEST_DATABASE_URL = (
-    "postgresql+asyncpg://postgres:your_postgres_password@localhost:5433/"
-    "neighborhood_library_test"
-)
 
 
 def _test_database_url() -> str:
-    return os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
+    """Resolve integration DB URL from env, falling back to local docker-compose defaults."""
+    explicit = os.environ.get("TEST_DATABASE_URL")
+    if explicit:
+        return explicit
+
+    user = os.environ.get("POSTGRES_USER", "postgres")
+    password = os.environ.get("POSTGRES_PASSWORD", "your_postgres_password")
+    host = os.environ.get("POSTGRES_HOST", "localhost")
+    port = os.environ.get("POSTGRES_PORT", "5433")
+    return (
+        f"postgresql+asyncpg://{user}:{password}@{host}:{port}/"
+        "neighborhood_library_test"
+    )
 
 
 async def _ensure_test_database_exists(url: str) -> None:
@@ -40,6 +48,8 @@ async def _ensure_test_database_exists(url: str) -> None:
         return
 
     admin_url = url_obj.set(database="postgres")
+    if url_obj.host == "postgres":
+        admin_url = admin_url.set(host="localhost", port=5433)
     engine = create_async_engine(admin_url, pool_pre_ping=True, isolation_level="AUTOCOMMIT")
     try:
         async with engine.connect() as conn:
@@ -86,7 +96,12 @@ def migrated_database(test_database_url: str) -> str:
 
     import asyncio
 
-    admin_probe_url = make_url(test_database_url).set(database="postgres")
+    url_obj = make_url(test_database_url)
+    admin_probe_url = url_obj.set(database="postgres")
+    # When POSTGRES_HOST targets the docker service name, probe via localhost:5433.
+    if url_obj.host == "postgres":
+        admin_probe_url = admin_probe_url.set(host="localhost", port=5433)
+
     if not asyncio.run(_database_reachable(str(admin_probe_url))):
         pytest.skip(
             "PostgreSQL is not reachable for integration tests. "
@@ -100,13 +115,19 @@ def migrated_database(test_database_url: str) -> str:
         pytest.skip(f"Could not connect to test database: {test_database_url}")
 
     env = {**os.environ, "DATABASE_URL": test_database_url}
-    subprocess.run(
+    result = subprocess.run(
         ["alembic", "upgrade", "head"],
         cwd=BACKEND_ROOT,
         env=env,
-        check=True,
+        check=False,
         capture_output=True,
+        text=True,
     )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Alembic migration failed for integration tests:\n"
+            f"{result.stderr or result.stdout}"
+        )
     return test_database_url
 
 

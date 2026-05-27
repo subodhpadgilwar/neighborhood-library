@@ -215,6 +215,7 @@ class BookService:
         updated_id: UUID
         try:
             async with transaction(db):
+                # Lock inventory row when adjusting copy counts or ISBN.
                 book = await BookRepository.get_by_id_for_update(db, book_id)
                 if book is None:
                     raise BookNotFoundException(book_id)
@@ -261,6 +262,8 @@ class BookService:
         """
         updated_id: UUID
         async with transaction(db):
+            # Lock book row so active-loan check and soft-delete cannot interleave
+            # with concurrent borrow/return updates to the same title.
             book = await BookRepository.get_by_id_for_update(
                 db,
                 book_id,
