@@ -1,13 +1,13 @@
 """Pydantic schemas for authentication requests and responses."""
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
-    """Schema for staff login credentials."""
+    """JSON login body schema (documentation; login uses form-urlencoded)."""
 
-    email: EmailStr
-    password: str = Field(min_length=6)
+    username: str
+    password: str
 
 
 class TokenResponse(BaseModel):

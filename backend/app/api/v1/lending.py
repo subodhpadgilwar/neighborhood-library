@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_staff, get_db
 from app.models.staff import Staff
 from app.schemas.lending import (
+    ActiveLoansResponse,
     BorrowRequest,
     LendingFilterParams,
     LendingHistoryResponse,
@@ -21,6 +22,7 @@ from app.schemas.lending import (
     LendingSortBy,
     LendingSortOrder,
     LendingStatusFilter,
+    OverdueLoansResponse,
     UpdateDueDateRequest,
 )
 from app.services.lending_service import LendingService
@@ -78,24 +80,38 @@ async def lending_history(
     return await LendingService.get_history(db, filters)
 
 
-@router.get("/", response_model=list[LendingResponse])
+@router.get("/", response_model=ActiveLoansResponse)
 async def list_active_loans(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
-) -> list[LendingResponse]:
-    """List all loans that have not yet been returned."""
-    loans = await LendingService.get_all_active(db)
-    return [LendingResponse.model_validate(loan) for loan in loans]
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+) -> ActiveLoansResponse:
+    """List loans that have not yet been returned."""
+    loans, total = await LendingService.get_all_active(db, skip=skip, limit=limit)
+    return ActiveLoansResponse(
+        items=[LendingResponse.model_validate(loan) for loan in loans],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
-@router.get("/overdue", response_model=list[LendingResponse])
+@router.get("/overdue", response_model=OverdueLoansResponse)
 async def list_overdue_loans(
     db: AsyncSession = Depends(get_db),
     current_staff: Staff = Depends(get_current_staff),
-) -> list[LendingResponse]:
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+) -> OverdueLoansResponse:
     """List active loans past their due date."""
-    loans = await LendingService.get_overdue(db)
-    return [LendingResponse.model_validate(loan) for loan in loans]
+    loans, total = await LendingService.get_overdue(db, skip=skip, limit=limit)
+    return OverdueLoansResponse(
+        items=[LendingResponse.model_validate(loan) for loan in loans],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.put("/{lending_id}/due-date", response_model=LendingResponse)

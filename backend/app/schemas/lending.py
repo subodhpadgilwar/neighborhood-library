@@ -40,61 +40,6 @@ class LendingFilterParams(BaseModel):
     skip: int = Field(default=0, ge=0)
     limit: int = Field(default=50, ge=1, le=200)
 
-    @field_validator("status")
-    @classmethod
-    def validate_status(cls, value: Optional[str]) -> Optional[str]:
-        """Validate that status is one of the allowed lending states.
-
-        Args:
-            value: Status filter value.
-
-        Returns:
-            The validated status, or None.
-
-        Raises:
-            ValueError: If status is not active, returned, or overdue.
-        """
-        if value is not None and value not in ("active", "returned", "overdue"):
-            raise ValueError("status must be one of: active, returned, overdue")
-        return value
-
-    @field_validator("sort_by")
-    @classmethod
-    def validate_sort_by(cls, value: Optional[str]) -> Optional[str]:
-        """Validate that sort_by is a supported column name.
-
-        Args:
-            value: Sort column name.
-
-        Returns:
-            The validated sort column, or None.
-
-        Raises:
-            ValueError: If sort_by is not a recognized column.
-        """
-        allowed = ("borrowed_at", "due_date", "member_name", "book_title", "returned_at")
-        if value is not None and value not in allowed:
-            raise ValueError(f"sort_by must be one of: {', '.join(allowed)}")
-        return value
-
-    @field_validator("sort_order")
-    @classmethod
-    def validate_sort_order(cls, value: Optional[str]) -> Optional[str]:
-        """Validate that sort_order is asc or desc.
-
-        Args:
-            value: Sort direction.
-
-        Returns:
-            The validated sort order, or None.
-
-        Raises:
-            ValueError: If sort_order is not asc or desc.
-        """
-        if value is not None and value not in ("asc", "desc"):
-            raise ValueError("sort_order must be one of: asc, desc")
-        return value
-
 
 class LendingHistoryResponse(BaseModel):
     """Paginated lending history response."""
@@ -104,6 +49,24 @@ class LendingHistoryResponse(BaseModel):
     page: int
     limit: int
     total_pages: int
+
+
+class ActiveLoansResponse(BaseModel):
+    """Paginated active loans response."""
+
+    items: list["LendingResponse"]
+    total: int
+    skip: int
+    limit: int
+
+
+class OverdueLoansResponse(BaseModel):
+    """Paginated overdue loans response."""
+
+    items: list["LendingResponse"]
+    total: int
+    skip: int
+    limit: int
 
 
 class UpdateDueDateRequest(BaseModel):
@@ -217,3 +180,5 @@ class LendingResponse(BaseModel):
 
 
 LendingHistoryResponse.model_rebuild()
+ActiveLoansResponse.model_rebuild()
+OverdueLoansResponse.model_rebuild()

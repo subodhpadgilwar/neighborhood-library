@@ -169,22 +169,41 @@ class LendingRepository:
         return list(result.scalars().all())
 
     @staticmethod
-    async def get_all_active(db: AsyncSession) -> list[LendingRecord]:
-        """Fetch all unreturned lending records.
+    async def get_all_active(
+        db: AsyncSession,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[LendingRecord], int]:
+        """Fetch paginated unreturned lending records with total count.
 
         Args:
             db: Async database session.
+            skip: Number of rows to skip.
+            limit: Maximum number of rows to return.
 
         Returns:
-            List of active LendingRecord rows with relationships loaded.
+            Tuple of active LendingRecord rows and total matching count.
         """
-        library_api.debug("LendingRepository.get_all_active")
-        result = await db.execute(
-            LendingRepository._select_lending().where(
-                LendingRecord.returned_at.is_(None)
-            )
+        library_api.debug(
+            "LendingRepository.get_all_active skip=%s limit=%s",
+            skip,
+            limit,
         )
-        return list(result.scalars().all())
+        active_filter = LendingRecord.returned_at.is_(None)
+
+        count_result = await db.execute(
+            select(func.count(func.distinct(LendingRecord.id))).where(active_filter)
+        )
+        total = count_result.scalar_one()
+
+        result = await db.execute(
+            LendingRepository._select_lending()
+            .where(active_filter)
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all()), total
 
     @staticmethod
     def _apply_history_joins(
@@ -358,24 +377,45 @@ class LendingRepository:
         return records, total
 
     @staticmethod
-    async def get_overdue(db: AsyncSession) -> list[LendingRecord]:
-        """Fetch all unreturned loans past their due date.
+    async def get_overdue(
+        db: AsyncSession,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[LendingRecord], int]:
+        """Fetch paginated unreturned loans past their due date with total count.
 
         Args:
             db: Async database session.
+            skip: Number of rows to skip.
+            limit: Maximum number of rows to return.
 
         Returns:
-            List of overdue LendingRecord rows with relationships loaded.
+            Tuple of overdue LendingRecord rows and total matching count.
         """
-        library_api.debug("LendingRepository.get_overdue")
-        current_time = now_utc()
-        result = await db.execute(
-            LendingRepository._select_lending().where(
-                LendingRecord.returned_at.is_(None),
-                LendingRecord.due_date < current_time,
-            )
+        library_api.debug(
+            "LendingRepository.get_overdue skip=%s limit=%s",
+            skip,
+            limit,
         )
-        return list(result.scalars().all())
+        current_time = now_utc()
+        overdue_filter = (
+            LendingRecord.returned_at.is_(None),
+            LendingRecord.due_date < current_time,
+        )
+
+        count_result = await db.execute(
+            select(func.count(func.distinct(LendingRecord.id))).where(*overdue_filter)
+        )
+        total = count_result.scalar_one()
+
+        result = await db.execute(
+            LendingRepository._select_lending()
+            .where(*overdue_filter)
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all()), total
 
     @staticmethod
     async def create_loan(

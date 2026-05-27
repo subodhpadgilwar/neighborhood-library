@@ -5,10 +5,10 @@ All routes protected by JWT authentication unless noted otherwise.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_staff, get_db
+from app.api.deps import get_current_staff, get_db, get_optional_staff
 from app.models.staff import Staff
 from app.schemas.book import BookCreate, BookListResponse, BookResponse, BookUpdate
 from app.services.book_service import BookService
@@ -19,15 +19,21 @@ router = APIRouter(prefix="/books", tags=["Books"])
 @router.get("/", response_model=BookListResponse)
 async def list_books(
     db: AsyncSession = Depends(get_db),
+    current_staff: Staff | None = Depends(get_optional_staff),
     page: int = Query(1, ge=1),
     limit: int = Query(100, ge=1, le=1000),
     search: str | None = Query(None, min_length=1, max_length=255),
     genre: str | None = Query(None, min_length=1, max_length=100),
     sort_by: str = Query("title", pattern="^(title|author|genre|created_at)$"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
-    include_inactive: bool = False,
+    include_inactive: bool = Query(False),
 ) -> BookListResponse:
     """List catalog books with server-side pagination and filtering (no JWT)."""
+    if include_inactive and current_staff is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to view inactive books",
+        )
     return await BookService.get_page(
         db,
         page=page,

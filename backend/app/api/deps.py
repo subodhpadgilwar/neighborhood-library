@@ -20,6 +20,32 @@ from app.models.staff import Staff
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
+async def get_optional_staff(
+    db: AsyncSession = Depends(get_db),
+    token: str | None = Depends(
+        OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+    ),
+) -> Staff | None:
+    """Resolve the current staff if a valid Bearer token is present, else return None."""
+    if token is None:
+        return None
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+    staff_id_raw = payload.get("sub")
+    if staff_id_raw is None:
+        return None
+    try:
+        staff_id = UUID(str(staff_id_raw))
+    except (TypeError, ValueError):
+        return None
+    result = await db.execute(select(Staff).where(Staff.id == staff_id))
+    staff = result.scalar_one_or_none()
+    if staff is None or not staff.is_active:
+        return None
+    return staff
+
+
 async def get_current_staff(
     db: AsyncSession = Depends(get_db),
     token: str = Depends(oauth2_scheme),

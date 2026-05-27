@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
-from app.api.deps import get_current_staff, get_db
+from app.api.deps import get_current_staff, get_db, get_optional_staff
 from app.core.timezone import now_utc
 from app.main import app
 from app.models.staff import Staff
@@ -97,6 +97,7 @@ def test_list_books_forwards_pagination_and_search(monkeypatch) -> None:
 
     monkeypatch.setattr(BookService, "get_page", get_page)
     app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_optional_staff] = lambda: make_staff()
 
     try:
         response = TestClient(app).get(

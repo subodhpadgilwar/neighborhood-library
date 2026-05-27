@@ -5,8 +5,9 @@ backend project root. Used across database, auth, logging, and seeding.
 """
 
 from pathlib import Path
+from typing import Any
 
-from pydantic import EmailStr, Field
+from pydantic import EmailStr, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,6 +45,9 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     app_port: int = 8000
+    cors_origins: list[str] = ["http://localhost:3000"]
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
 
     # Auth
     secret_key: str = "change-me"
@@ -62,6 +66,14 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     log_retention_days: int = Field(default=30, ge=1)
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Any) -> list[str]:
+        """Parse comma-separated CORS_ORIGINS env values into a list."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
     @property
     def is_development(self) -> bool:

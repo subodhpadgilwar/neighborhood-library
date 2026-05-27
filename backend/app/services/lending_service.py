@@ -316,25 +316,39 @@ class LendingService:
         )
 
     @staticmethod
-    async def get_all_active(db: AsyncSession) -> list[LendingRecord]:
-        """Return every loan that has not yet been returned.
+    async def get_all_active(
+        db: AsyncSession,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[LendingRecord], int]:
+        """Return paginated loans that have not yet been returned.
 
         Args:
             db: Async database session.
+            skip: Number of rows to skip.
+            limit: Maximum number of rows to return.
 
         Returns:
-            List of active LendingRecord models.
+            Tuple of active LendingRecord models and total matching count.
         """
-        return await LendingRepository.get_all_active(db)
+        return await LendingRepository.get_all_active(db, skip=skip, limit=limit)
 
     @staticmethod
-    async def get_overdue(db: AsyncSession) -> list[LendingRecord]:
-        """Return active loans whose due date is before the current UTC time.
+    async def get_overdue(
+        db: AsyncSession,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[LendingRecord], int]:
+        """Return paginated active loans past their due date.
 
         Args:
             db: Async database session.
+            skip: Number of rows to skip.
+            limit: Maximum number of rows to return.
 
         Returns:
-            List of overdue LendingRecord models.
+            Tuple of overdue LendingRecord models and total matching count.
         """
-        return await LendingRepository.get_overdue(db)
+        return await LendingRepository.get_overdue(db, skip=skip, limit=limit)
