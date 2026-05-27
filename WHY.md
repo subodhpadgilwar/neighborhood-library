@@ -234,11 +234,13 @@ Any production system needs accountability.
 
 ---
 
-## 8. Authentication — JWT over Sessions
+## 8. Authentication — JWT + HttpOnly Cookie Proxy
 
 ### Decision
 JWT (JSON Web Tokens) with python-jose
-and bcrypt password hashing.
+and bcrypt password hashing, delivered to
+the browser via HttpOnly cookie through
+Next.js route handlers.
 
 ### Why
 JWT is stateless — the server stores nothing.
@@ -249,10 +251,19 @@ in the token. This means:
 - Horizontal scaling works without sticky sessions
 - Simple to implement and reason about
 
+On the frontend we do not expose tokens to
+browser JavaScript. Login route stores token
+in an HttpOnly cookie, and Next.js proxy route
+reads that cookie server-side and forwards
+Authorization: Bearer headers to FastAPI.
+This reduces token theft risk from XSS compared
+to localStorage/sessionStorage token storage.
+
 ### Tradeoff Acknowledged
 JWT tokens cannot be invalidated before expiry.
 If a staff member is deactivated, their token
-remains valid until expiry (60 minutes by default).
+remains valid until expiry (60 minutes by default,
+configurable via ACCESS_TOKEN_EXPIRE_MINUTES).
 For a library system this is an acceptable tradeoff.
 In a higher-security system we would maintain a
 token blacklist in Redis.
@@ -601,7 +612,7 @@ impossible in practice.
 | Availability | Counter column | O(1) vs O(n) count query |
 | Delete strategy | Soft delete | Preserve history |
 | Audit trail | AuditMixin | Accountability, DRY |
-| Auth | JWT stateless | No session storage needed |
+| Auth | JWT + HttpOnly proxy cookie | Stateless auth with reduced token exposure |
 | Errors | Custom exceptions | Consistency, maintainability |
 | Timezone | UTC store, local serve | Correctness, flexibility |
 | Seeder | Idempotent startup | Developer experience |
